@@ -1,4 +1,5 @@
 import 'package:dishmark/data/dish_mark.dart';
+import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
@@ -32,6 +33,8 @@ class _DishMapState extends State<DishMap> {
     return Scaffold(
       appBar: AppBar(title: const Text("DishMark")),
       body: ListView.builder(
+        shrinkWrap: true,
+        physics: const AlwaysScrollableScrollPhysics(),
         itemCount: marks.length,
         itemBuilder: (context, index) {
           final mark = marks[index];
@@ -49,6 +52,20 @@ class _DishMapState extends State<DishMap> {
           );
         },
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => CreateDishMark()),
+          );
+          loadData();
+        },
+        foregroundColor: Colors.black,
+        backgroundColor: Colors.white,
+        // shape: customizations[index].$3,
+        child: const Icon(Icons.navigation),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

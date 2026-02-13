@@ -56,7 +56,7 @@ const DishMarkSchema = CollectionSchema(
     r'priceLevel': PropertySchema(
       id: 7,
       name: r'priceLevel',
-      type: IsarType.long,
+      type: IsarType.double,
     ),
     r'updatedAt': PropertySchema(
       id: 8,
@@ -116,7 +116,7 @@ void _dishMarkSerialize(
   writer.writeByteList(offsets[4], object.flavors.map((e) => e.index).toList());
   writer.writeString(offsets[5], object.imagePath);
   writer.writeDateTime(offsets[6], object.lastTastedAt);
-  writer.writeLong(offsets[7], object.priceLevel);
+  writer.writeDouble(offsets[7], object.priceLevel);
   writer.writeDateTime(offsets[8], object.updatedAt);
 }
 
@@ -139,7 +139,7 @@ DishMark _dishMarkDeserialize(
   object.id = id;
   object.imagePath = reader.readString(offsets[5]);
   object.lastTastedAt = reader.readDateTimeOrNull(offsets[6]);
-  object.priceLevel = reader.readLongOrNull(offsets[7]);
+  object.priceLevel = reader.readDoubleOrNull(offsets[7]);
   object.updatedAt = reader.readDateTime(offsets[8]);
   return object;
 }
@@ -170,7 +170,7 @@ P _dishMarkDeserializeProp<P>(
     case 6:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 8:
       return (reader.readDateTime(offset)) as P;
     default:
@@ -1104,46 +1104,54 @@ extension DishMarkQueryFilter
   }
 
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> priceLevelEqualTo(
-      int? value) {
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'priceLevel',
         value: value,
+        epsilon: epsilon,
       ));
     });
   }
 
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> priceLevelGreaterThan(
-    int? value, {
+    double? value, {
     bool include = false,
+    double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
         property: r'priceLevel',
         value: value,
+        epsilon: epsilon,
       ));
     });
   }
 
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> priceLevelLessThan(
-    int? value, {
+    double? value, {
     bool include = false,
+    double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
         property: r'priceLevel',
         value: value,
+        epsilon: epsilon,
       ));
     });
   }
 
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> priceLevelBetween(
-    int? lower,
-    int? upper, {
+    double? lower,
+    double? upper, {
     bool includeLower = true,
     bool includeUpper = true,
+    double epsilon = Query.epsilon,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
@@ -1152,6 +1160,7 @@ extension DishMarkQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+        epsilon: epsilon,
       ));
     });
   }
@@ -1549,7 +1558,7 @@ extension DishMarkQueryProperty
     });
   }
 
-  QueryBuilder<DishMark, int?, QQueryOperations> priceLevelProperty() {
+  QueryBuilder<DishMark, double?, QQueryOperations> priceLevelProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'priceLevel');
     });

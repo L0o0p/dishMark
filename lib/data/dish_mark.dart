@@ -13,7 +13,7 @@ class DishMark {
   late String dishName;
   final store = IsarLink<Store>();
 
-  int? priceLevel;
+  double? priceLevel;
   @enumerated
   List<Flavor> flavors = [];
 
