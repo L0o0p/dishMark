@@ -28,6 +28,8 @@
 	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>需要定位以展示附近店铺</string>
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 		<key>UISceneConfigurations</key>

@@ -1,28 +1,38 @@
 PODS:
+  - AMap3DMap (10.1.600):
+    - AMapFoundation (>= 1.8.0)
+  - amap_flutter_map_plus (0.0.1):
+    - AMap3DMap
+    - Flutter
+  - AMapFoundation (1.8.2)
   - Flutter (1.0.0)
   - isar_flutter_libs (1.0.0):
     - Flutter
-  - path_provider_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
 
 DEPENDENCIES:
+  - amap_flutter_map_plus (from `.symlinks/plugins/amap_flutter_map_plus/ios`)
   - Flutter (from `Flutter`)
   - isar_flutter_libs (from `.symlinks/plugins/isar_flutter_libs/ios`)
-  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+
+SPEC REPOS:
+  trunk:
+    - AMap3DMap
+    - AMapFoundation
 
 EXTERNAL SOURCES:
+  amap_flutter_map_plus:
+    :path: ".symlinks/plugins/amap_flutter_map_plus/ios"
   Flutter:
     :path: Flutter
   isar_flutter_libs:
     :path: ".symlinks/plugins/isar_flutter_libs/ios"
-  path_provider_foundation:
-    :path: ".symlinks/plugins/path_provider_foundation/darwin"
 
 SPEC CHECKSUMS:
+  AMap3DMap: e67fc1a66bd83b82b44a06b601864d9fb3db3de0
+  amap_flutter_map_plus: 1df734b018cc8f3b4f7af6e611248fa61a268c6c
+  AMapFoundation: 9885c48fc3a78fdfb84a0299a2293e56ea3c9fec
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   isar_flutter_libs: 9fc2cfb928c539e1b76c481ba5d143d556d94920
-  path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 

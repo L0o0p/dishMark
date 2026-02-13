@@ -1,2 +1,6 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"
+
+// AMap iOS SDK pods currently exclude arm64 for the simulator.
+// Keep Runner consistent so the Pods_Runner product is built and linkable.
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64
