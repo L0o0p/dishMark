@@ -41,13 +41,16 @@ class _DishMapState extends State<DishMap> {
           final mark = marks[index];
           return ListTile(
             title: Text(mark.dishName),
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              final deleted = await Navigator.push<bool>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => DishMarkDetail(markId: mark.id),
                 ),
               );
+              if (deleted == true) {
+                loadData();
+              }
             },
 
             subtitle: Column(
@@ -73,7 +76,7 @@ class _DishMapState extends State<DishMap> {
         foregroundColor: Colors.black,
         backgroundColor: Colors.white,
         // shape: customizations[index].$3,
-        child: const Icon(Icons.navigation),
+        child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
