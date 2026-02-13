@@ -1,5 +1,6 @@
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/page/create_dish_mark.dart';
+import 'package:dishmark/page/dish_mark_detail.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
@@ -40,6 +41,15 @@ class _DishMapState extends State<DishMap> {
           final mark = marks[index];
           return ListTile(
             title: Text(mark.dishName),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DishMarkDetail(markId: mark.id),
+                ),
+              );
+            },
+
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
