@@ -1,5 +1,7 @@
 import 'package:isar/isar.dart';
 
+import 'package:dishmark/data/store.dart';
+
 part 'dish_mark.g.dart';
 
 enum Flavor { spicy, sweet, savory, sour, bitter, fresh, greasy }
@@ -9,7 +11,7 @@ class DishMark {
   Id id = Isar.autoIncrement;
 
   late String dishName;
-  late String storeId;
+  final store = IsarLink<Store>();
 
   int? priceLevel;
   @enumerated

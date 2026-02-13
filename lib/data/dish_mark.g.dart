@@ -58,13 +58,8 @@ const DishMarkSchema = CollectionSchema(
       name: r'priceLevel',
       type: IsarType.long,
     ),
-    r'storeId': PropertySchema(
-      id: 8,
-      name: r'storeId',
-      type: IsarType.string,
-    ),
     r'updatedAt': PropertySchema(
-      id: 9,
+      id: 8,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -75,7 +70,14 @@ const DishMarkSchema = CollectionSchema(
   deserializeProp: _dishMarkDeserializeProp,
   idName: r'id',
   indexes: {},
-  links: {},
+  links: {
+    r'store': LinkSchema(
+      id: -7706114990261602117,
+      name: r'store',
+      target: r'Store',
+      single: true,
+    )
+  },
   embeddedSchemas: {},
   getId: _dishMarkGetId,
   getLinks: _dishMarkGetLinks,
@@ -98,7 +100,6 @@ int _dishMarkEstimateSize(
   }
   bytesCount += 3 + object.flavors.length;
   bytesCount += 3 + object.imagePath.length * 3;
-  bytesCount += 3 + object.storeId.length * 3;
   return bytesCount;
 }
 
@@ -116,8 +117,7 @@ void _dishMarkSerialize(
   writer.writeString(offsets[5], object.imagePath);
   writer.writeDateTime(offsets[6], object.lastTastedAt);
   writer.writeLong(offsets[7], object.priceLevel);
-  writer.writeString(offsets[8], object.storeId);
-  writer.writeDateTime(offsets[9], object.updatedAt);
+  writer.writeDateTime(offsets[8], object.updatedAt);
 }
 
 DishMark _dishMarkDeserialize(
@@ -140,8 +140,7 @@ DishMark _dishMarkDeserialize(
   object.imagePath = reader.readString(offsets[5]);
   object.lastTastedAt = reader.readDateTimeOrNull(offsets[6]);
   object.priceLevel = reader.readLongOrNull(offsets[7]);
-  object.storeId = reader.readString(offsets[8]);
-  object.updatedAt = reader.readDateTime(offsets[9]);
+  object.updatedAt = reader.readDateTime(offsets[8]);
   return object;
 }
 
@@ -173,8 +172,6 @@ P _dishMarkDeserializeProp<P>(
     case 7:
       return (reader.readLongOrNull(offset)) as P;
     case 8:
-      return (reader.readString(offset)) as P;
-    case 9:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -205,11 +202,12 @@ Id _dishMarkGetId(DishMark object) {
 }
 
 List<IsarLinkBase<dynamic>> _dishMarkGetLinks(DishMark object) {
-  return [];
+  return [object.store];
 }
 
 void _dishMarkAttach(IsarCollection<dynamic> col, Id id, DishMark object) {
   object.id = id;
+  object.store.attach(col, col.isar.collection<Store>(), r'store', id);
 }
 
 extension DishMarkQueryWhereSort on QueryBuilder<DishMark, DishMark, QWhere> {
@@ -1158,136 +1156,6 @@ extension DishMarkQueryFilter
     });
   }
 
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'storeId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'storeId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdLessThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'storeId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdBetween(
-    String lower,
-    String upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'storeId',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'storeId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'storeId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdContains(
-      String value,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'storeId',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'storeId',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'storeId',
-        value: '',
-      ));
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIdIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'storeId',
-        value: '',
-      ));
-    });
-  }
-
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> updatedAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -1346,7 +1214,20 @@ extension DishMarkQueryObject
     on QueryBuilder<DishMark, DishMark, QFilterCondition> {}
 
 extension DishMarkQueryLinks
-    on QueryBuilder<DishMark, DishMark, QFilterCondition> {}
+    on QueryBuilder<DishMark, DishMark, QFilterCondition> {
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> store(
+      FilterQuery<Store> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'store');
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'store', 0, true, 0, true);
+    });
+  }
+}
 
 extension DishMarkQuerySortBy on QueryBuilder<DishMark, DishMark, QSortBy> {
   QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByCreatedAt() {
@@ -1430,18 +1311,6 @@ extension DishMarkQuerySortBy on QueryBuilder<DishMark, DishMark, QSortBy> {
   QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByPriceLevelDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'priceLevel', Sort.desc);
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByStoreId() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'storeId', Sort.asc);
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByStoreIdDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'storeId', Sort.desc);
     });
   }
 
@@ -1556,18 +1425,6 @@ extension DishMarkQuerySortThenBy
     });
   }
 
-  QueryBuilder<DishMark, DishMark, QAfterSortBy> thenByStoreId() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'storeId', Sort.asc);
-    });
-  }
-
-  QueryBuilder<DishMark, DishMark, QAfterSortBy> thenByStoreIdDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'storeId', Sort.desc);
-    });
-  }
-
   QueryBuilder<DishMark, DishMark, QAfterSortBy> thenByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -1635,13 +1492,6 @@ extension DishMarkQueryWhereDistinct
     });
   }
 
-  QueryBuilder<DishMark, DishMark, QDistinct> distinctByStoreId(
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'storeId', caseSensitive: caseSensitive);
-    });
-  }
-
   QueryBuilder<DishMark, DishMark, QDistinct> distinctByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAt');
@@ -1702,12 +1552,6 @@ extension DishMarkQueryProperty
   QueryBuilder<DishMark, int?, QQueryOperations> priceLevelProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'priceLevel');
-    });
-  }
-
-  QueryBuilder<DishMark, String, QQueryOperations> storeIdProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'storeId');
     });
   }
 
