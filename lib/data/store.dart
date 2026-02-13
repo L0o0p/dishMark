@@ -1,30 +1,22 @@
+import 'package:isar/isar.dart';
+
+part 'store.g.dart';
+
 enum QueueLevel { noQueue, within30Min, over1Hour, reservationNeeded }
 
+@collection
 class Store {
-  final String id;
-  final String storeName; // 店铺或品牌名称
+  Id id = Isar.autoIncrement;
 
-  // 排队时长
-  final QueueLevel?
-  queueLevel; // noQueue / within30Min / over1Hour / reservationNeeded
+  late String storeName;
 
-  // 位置信息
-  final double? latitude;
-  final double? longitude;
+  @enumerated
+  late QueueLevel queueLevel;
 
-  // 日期
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final DateTime? deletedAt;
+  double? latitude;
+  double? longitude;
 
-  Store({
-    required this.id,
-    required this.storeName,
-    required this.createdAt,
-    required this.updatedAt,
-    this.deletedAt,
-    this.latitude,
-    this.longitude,
-    this.queueLevel,
-  });
+  late DateTime createdAt;
+  late DateTime updatedAt;
+  DateTime? deletedAt;
 }
