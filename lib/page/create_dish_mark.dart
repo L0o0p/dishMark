@@ -1,12 +1,16 @@
 import 'dart:collection';
 
+import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
 
 class CreateDishMark extends StatefulWidget {
-  const CreateDishMark({super.key});
+  final LatLng? currentLocation;
+  final String? initialStoreName;
+
+  const CreateDishMark({super.key, this.currentLocation, this.initialStoreName});
 
   @override
   State<CreateDishMark> createState() => _CreateDishMarkState();
@@ -19,6 +23,15 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   final TextEditingController experienceController = TextEditingController();
   final TextEditingController flavorsController = TextEditingController();
   List<Flavor> selectedFlavors = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final String initialStoreName = widget.initialStoreName?.trim() ?? '';
+    if (initialStoreName.isNotEmpty) {
+      storeController.text = initialStoreName;
+    }
+  }
 
   Future<void> _selectFlavors() async {
     final result = await showDialog<List<Flavor>>(
@@ -57,6 +70,14 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   }
 
   Future<void> save() async {
+    final currentLocation = widget.currentLocation;
+    if (currentLocation == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('尚未获取当前位置，请稍后重试')));
+      return;
+    }
+
     // 解析价格
     double? priceValue;
     final priceText = priceController.text.trim();
@@ -82,6 +103,8 @@ class _CreateDishMarkState extends State<CreateDishMark> {
       final store = Store()
         ..storeName = storeController.text
         ..queueLevel = QueueLevel.noQueue
+        ..latitude = currentLocation.latitude
+        ..longitude = currentLocation.longitude
         ..createdAt = DateTime.now()
         ..updatedAt = DateTime.now();
 
@@ -124,7 +147,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
           children: [
             TextField(
               controller: storeController,
-              decoration: const InputDecoration(labelText: "Store Name"),
+              decoration: const InputDecoration(labelText: "Store Name | Location"),
             ),
             TextField(
               controller: dishController,
@@ -149,6 +172,15 @@ class _CreateDishMarkState extends State<CreateDishMark> {
               ),
               maxLines: 3,
             ),
+            const SizedBox(height: 8),
+            // Align(
+            //   alignment: Alignment.centerLeft,
+            //   child: Text(
+            //     widget.currentLocation == null
+            //         ? '当前位置: 未获取'
+            //         : '当前位置: ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
+            //   ),
+            // ),
             ElevatedButton(onPressed: save, child: const Text("Save")),
           ],
         ),

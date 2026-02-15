@@ -179,7 +179,12 @@ class _DishMapState extends State<DishMap> {
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => CreateDishMark()),
+                MaterialPageRoute(
+                  builder: (_) => CreateDishMark(
+                    currentLocation: _myLatLng,
+                    initialStoreName: _lastPoiName,
+                  ),
+                ),
               );
               loadStores();
             },
