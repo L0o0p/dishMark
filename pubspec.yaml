@@ -14,6 +14,8 @@ dependencies:
   path_provider: ^2.1.0
   amap_flutter_map_plus: ^3.1.1
   amap_flutter_base_plus: ^3.1.0
+  permission_handler: ^11.3.1
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -21,6 +23,11 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   isar_generator: ^3.1.0
   build_runner: ^2.4.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.jpg"
 
 flutter:
   uses-material-design: true
