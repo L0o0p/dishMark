@@ -6,6 +6,7 @@ import 'package:dishmark/page/dish_list.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class DishMap extends StatefulWidget {
   const DishMap({super.key});
@@ -16,11 +17,24 @@ class DishMap extends StatefulWidget {
 
 class _DishMapState extends State<DishMap> {
   Set<Marker> markers = {};
+  AMapController? _mapController;
+  Set<Polyline> polylines = {};
+  Set<Polygon> polygons = {};
+  String? _lastPoiName;
+  String? _lastTap;
+  LatLng? _myLatLng;
+  Marker? _myLocationMarker;
 
   @override
   void initState() {
     super.initState();
+    _requestLocationPermission();
     loadStores();
+  }
+
+  void _requestLocationPermission() async {
+    final status = await Permission.locationWhenInUse.request();
+    debugPrint('locationWhenInUse permission: $status');
   }
 
   Future<void> loadStores() async {
@@ -43,28 +57,130 @@ class _DishMapState extends State<DishMap> {
     });
   }
 
+  void _onMapCreated(AMapController c) => _mapController = c;
+
+  void _jumpToShanghai() {
+    _mapController?.moveCamera(
+      CameraUpdate.newLatLngZoom(const LatLng(31.2304, 121.4737), 14),
+      animated: true,
+    );
+  }
+
+  void _goToMyLocation() {
+    final LatLng? latLng = _myLatLng;
+    if (latLng == null) {
+      debugPrint('No location yet');
+      return;
+    }
+    _mapController?.moveCamera(
+      CameraUpdate.newLatLngZoom(latLng, 16),
+      animated: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final Set<Marker> allMarkers = <Marker>{
+      ...markers,
+      if (_myLocationMarker != null) _myLocationMarker!,
+    };
+
     return Scaffold(
-      body: AMapWidget(
-        // Required by AMap iOS SDK >= 8.1.0, otherwise native code may assert and crash.
-        privacyStatement: const AMapPrivacyStatement(
-          hasContains: true,
-          hasShow: true,
-          hasAgree: true,
-        ),
-        // Redundant with iOS AppDelegate config, but passing it here guarantees the key
-        // is set before the native map view asserts on startup.
-        apiKey: const AMapApiKey(iosKey: '8dc446dcf3651779abbd5df092b607a7'),
-        initialCameraPosition: const CameraPosition(
-          target: LatLng(22.3193, 114.1694),
-          zoom: 12,
-        ),
-        markers: markers,
+      body: Stack(
+        children: [
+          AMapWidget(
+            onMapCreated: _onMapCreated,
+            onPoiTouched: (poi) => setState(() => _lastPoiName = poi.name),
+            onLocationChanged: (AMapLocation location) {
+              final LatLng latLng = location.latLng;
+              setState(() {
+                _myLatLng = latLng;
+                _myLocationMarker = (_myLocationMarker == null)
+                    ? Marker(
+                        position: latLng,
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueAzure,
+                        ),
+                        infoWindow: const InfoWindow(title: '当前位置'),
+                      )
+                    : _myLocationMarker!.copyWith(positionParam: latLng);
+              });
+            },
+            onTap: (latLng) {
+              setState(() {
+                _lastTap =
+                    '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
+              });
+            },
+            myLocationStyleOptions: MyLocationStyleOptions(
+              true,
+              circleFillColor: Colors.lightBlue,
+              circleStrokeColor: Colors.blue,
+              circleStrokeWidth: 1,
+            ),
+            touchPoiEnabled: true,
+            polylines: polylines,
+            polygons: polygons,
+            // Required by AMap iOS SDK >= 8.1.0, otherwise native code may assert and crash.
+            privacyStatement: const AMapPrivacyStatement(
+              hasContains: true,
+              hasShow: true,
+              hasAgree: true,
+            ),
+            // Redundant with iOS AppDelegate config, but passing it here guarantees the key
+            // is set before the native map view asserts on startup.
+            apiKey: const AMapApiKey(
+              iosKey: '8dc446dcf3651779abbd5df092b607a7',
+            ),
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(22.3193, 114.1694),
+              zoom: 12,
+            ),
+            markers: allMarkers,
+          ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'POI: ${_lastPoiName ?? '（暂无）'}\nTap: ${_lastTap ?? '（暂无）'}\nMe: ${_myLatLng == null ? '（暂无）' : '${_myLatLng!.latitude.toStringAsFixed(5)}, ${_myLatLng!.longitude.toStringAsFixed(5)}'}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const SizedBox(width: 12),
+          FloatingActionButton(
+            heroTag: 'jump_shanghai_fab',
+            onPressed: _jumpToShanghai,
+            foregroundColor: Colors.black,
+            backgroundColor: Colors.white,
+            child: const Icon(Icons.near_me),
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton(
+            heroTag: 'go_my_location_fab',
+            onPressed: _goToMyLocation,
+            foregroundColor: Colors.black,
+            backgroundColor: Colors.white,
+            child: const Icon(Icons.my_location),
+          ),
+          const SizedBox(width: 12),
           FloatingActionButton(
             heroTag: 'add_mark_fab',
             onPressed: () async {
