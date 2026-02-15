@@ -24,6 +24,7 @@ class _DishMapState extends State<DishMap> {
   String? _lastTap;
   LatLng? _myLatLng;
   Marker? _myLocationMarker;
+  bool _hasCenteredOnMyLocation = false;
 
   @override
   void initState() {
@@ -58,13 +59,6 @@ class _DishMapState extends State<DishMap> {
   }
 
   void _onMapCreated(AMapController c) => _mapController = c;
-
-  void _jumpToShanghai() {
-    _mapController?.moveCamera(
-      CameraUpdate.newLatLngZoom(const LatLng(31.2304, 121.4737), 14),
-      animated: true,
-    );
-  }
 
   void _goToMyLocation() {
     final LatLng? latLng = _myLatLng;
@@ -105,6 +99,13 @@ class _DishMapState extends State<DishMap> {
                       )
                     : _myLocationMarker!.copyWith(positionParam: latLng);
               });
+              if (!_hasCenteredOnMyLocation) {
+                _hasCenteredOnMyLocation = true;
+                _mapController?.moveCamera(
+                  CameraUpdate.newLatLngZoom(latLng, 16),
+                  animated: true,
+                );
+              }
             },
             onTap: (latLng) {
               setState(() {
@@ -132,9 +133,9 @@ class _DishMapState extends State<DishMap> {
             apiKey: const AMapApiKey(
               iosKey: '8dc446dcf3651779abbd5df092b607a7',
             ),
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(22.3193, 114.1694),
-              zoom: 12,
+            initialCameraPosition: CameraPosition(
+              target: _myLatLng ?? const LatLng(22.3193, 114.1694),
+              zoom: _myLatLng == null ? 12 : 16,
             ),
             markers: allMarkers,
           ),
@@ -164,14 +165,6 @@ class _DishMapState extends State<DishMap> {
       floatingActionButton: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            heroTag: 'jump_shanghai_fab',
-            onPressed: _jumpToShanghai,
-            foregroundColor: Colors.black,
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.near_me),
-          ),
           const SizedBox(width: 12),
           FloatingActionButton(
             heroTag: 'go_my_location_fab',
