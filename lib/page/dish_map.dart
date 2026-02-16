@@ -28,6 +28,8 @@ class _DishMapState extends State<DishMap> {
   Set<Polyline> polylines = {};
   Set<Polygon> polygons = {};
   BitmapDescriptor _dishMarkerIcon = BitmapDescriptor.defaultMarker;
+  final Map<int, BitmapDescriptor> _dishMarkerIconCache =
+      <int, BitmapDescriptor>{};
   String? _lastPoiName;
   LatLng? _lastTapLatLng;
   LatLng? _myLatLng;
@@ -49,15 +51,28 @@ class _DishMapState extends State<DishMap> {
 
   Future<void> _initDishMarkerIcon() async {
     try {
-      _dishMarkerIcon = await _buildResizedMarkerIcon(
-        assetPath: _dishIconAssetPath,
-        targetSizePx: _dishIconSizePx,
-      );
+      _dishMarkerIcon = await _getDishMarkerIconByScale(1.0);
     } catch (e) {
       debugPrint('Failed to build resized marker icon: $e');
       _dishMarkerIcon = BitmapDescriptor.defaultMarker;
     }
     await loadDishMarkers();
+  }
+
+  Future<BitmapDescriptor> _getDishMarkerIconByScale(double scale) async {
+    final int targetSizePx =
+        ((_dishIconSizePx * scale).round()).clamp(1, 1024) as int;
+    final BitmapDescriptor? cachedIcon = _dishMarkerIconCache[targetSizePx];
+    if (cachedIcon != null) {
+      return cachedIcon;
+    }
+
+    final BitmapDescriptor icon = await _buildResizedMarkerIcon(
+      assetPath: _dishIconAssetPath,
+      targetSizePx: targetSizePx,
+    );
+    _dishMarkerIconCache[targetSizePx] = icon;
+    return icon;
   }
 
   Future<BitmapDescriptor> _buildResizedMarkerIcon({
@@ -130,30 +145,47 @@ class _DishMapState extends State<DishMap> {
     _focusOnDishMarkersIfNeeded(Set<Marker>.of(_dishMarkerMap.values));
   }
 
-  // 增量添加新mark
-  void _addDishMarker(DishMark dish, {required BitmapDescriptor icon}) async {
+  Future<void> _playAppearAnimation(DishMark dish) async {
+    const List<double> scales = <double>[
+      0.20,
+      0.34,
+      0.48,
+      0.64,
+      0.80,
+      0.95,
+      1.06,
+      1.02,
+      1.00,
+    ];
+    const List<int> frameDelaysMs = <int>[45, 45, 45, 45, 45, 45, 70, 70, 90];
+
     await dish.store.load();
     final store = dish.store.value;
     if (store == null || store.latitude == null || store.longitude == null) {
       return;
     }
 
-    final marker = Marker(
-      position: LatLng(store.latitude!, store.longitude!),
-      icon: icon,
-      zIndex: 10,
-      infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
-    );
+    for (int i = 0; i < scales.length; i++) {
+      final double scale = scales[i];
+      final BitmapDescriptor icon = await _getDishMarkerIconByScale(scale);
 
-    if (!mounted) {
-      return;
+      final marker = Marker(
+        position: LatLng(store.latitude!, store.longitude!),
+        icon: icon,
+        zIndex: 10,
+        infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
+      );
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _dishMarkerMap[dish.id] = marker;
+      });
+
+      await Future<void>.delayed(Duration(milliseconds: frameDelaysMs[i]));
     }
-    setState(() {
-      _dishMarkerMap[dish.id] = marker;
-    });
   }
-
-  void _playAppearAnimation(int dishId) {}
 
   void _onMapCreated(AMapController c) {
     _mapController = c;
@@ -314,8 +346,7 @@ class _DishMapState extends State<DishMap> {
                 ),
               );
               if (newDish != null) {
-                _addDishMarker(newDish, icon: _dishMarkerIcon);
-                _playAppearAnimation(newDish.id);
+                await _playAppearAnimation(newDish);
               }
             },
             foregroundColor: Colors.black,
@@ -332,8 +363,7 @@ class _DishMapState extends State<DishMap> {
               );
               // loadDishMarkers(); 使用增量添加，不再需要重载
               if (newDish != null) {
-                _addDishMarker(newDish, icon: _dishMarkerIcon);
-                _playAppearAnimation(newDish.id);
+                await _playAppearAnimation(newDish);
               }
             },
             foregroundColor: Colors.black,
