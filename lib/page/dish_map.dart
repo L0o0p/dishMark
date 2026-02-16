@@ -6,6 +6,7 @@ import 'package:amap_flutter_map_plus/amap_flutter_map_plus.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/page/dish_list.dart';
+import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,12 +37,21 @@ class _DishMapState extends State<DishMap> {
   Marker? _myLocationMarker;
   bool _hasCenteredOnMyLocation = false;
   bool _hasCenteredOnDishMarkers = false;
+  late final VoidCallback _onDeletedDishChanged;
 
   @override
   void initState() {
     super.initState();
     _requestLocationPermission();
     _initDishMarkerIcon();
+    _onDeletedDishChanged = () {
+      final id = DishEvents.deletedDishId.value;
+      if (id != null) {
+        _removeDishMarker(id);
+        DishEvents.deletedDishId.value = null;
+      }
+    };
+    DishEvents.deletedDishId.addListener(_onDeletedDishChanged);
   }
 
   void _requestLocationPermission() async {
@@ -229,6 +239,23 @@ class _DishMapState extends State<DishMap> {
       CameraUpdate.newLatLngZoom(latLng, 16),
       animated: true,
     );
+  }
+
+  // 删除mark
+  void _removeDishMarker(int id) {
+    if (!_dishMarkerMap.containsKey(id)) {
+      debugPrint('Dish marker not found for dish id: $id');
+      return;
+    }
+    setState(() {
+      _dishMarkerMap.remove(id);
+    });
+  }
+
+  @override
+  void dispose() {
+    DishEvents.deletedDishId.removeListener(_onDeletedDishChanged);
+    super.dispose();
   }
 
   @override
