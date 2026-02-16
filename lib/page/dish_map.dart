@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
 import 'package:amap_flutter_map_plus/amap_flutter_map_plus.dart';
 import 'package:dishmark/data/dish_mark.dart';
@@ -5,6 +8,7 @@ import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/page/dish_list.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -16,10 +20,14 @@ class DishMap extends StatefulWidget {
 }
 
 class _DishMapState extends State<DishMap> {
-  final Map<String, Marker> _dishMarkerMap = <String, Marker>{};
+  static const String _dishIconAssetPath = 'assets/logo.jpg';
+  static const int _dishIconSizePx = 72;
+
+  final Map<int, Marker> _dishMarkerMap = <int, Marker>{};
   AMapController? _mapController;
   Set<Polyline> polylines = {};
   Set<Polygon> polygons = {};
+  BitmapDescriptor _dishMarkerIcon = BitmapDescriptor.defaultMarker;
   String? _lastPoiName;
   LatLng? _lastTapLatLng;
   LatLng? _myLatLng;
@@ -31,7 +39,7 @@ class _DishMapState extends State<DishMap> {
   void initState() {
     super.initState();
     _requestLocationPermission();
-    loadDishMarkers();
+    _initDishMarkerIcon();
   }
 
   void _requestLocationPermission() async {
@@ -39,9 +47,47 @@ class _DishMapState extends State<DishMap> {
     debugPrint('locationWhenInUse permission: $status');
   }
 
+  Future<void> _initDishMarkerIcon() async {
+    try {
+      _dishMarkerIcon = await _buildResizedMarkerIcon(
+        assetPath: _dishIconAssetPath,
+        targetSizePx: _dishIconSizePx,
+      );
+    } catch (e) {
+      debugPrint('Failed to build resized marker icon: $e');
+      _dishMarkerIcon = BitmapDescriptor.defaultMarker;
+    }
+    await loadDishMarkers();
+  }
+
+  Future<BitmapDescriptor> _buildResizedMarkerIcon({
+    required String assetPath,
+    required int targetSizePx,
+  }) async {
+    final ByteData byteData = await rootBundle.load(assetPath);
+    final Uint8List rawBytes = byteData.buffer.asUint8List();
+
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      rawBytes,
+      targetWidth: targetSizePx,
+      targetHeight: targetSizePx,
+    );
+    final ui.FrameInfo frame = await codec.getNextFrame();
+    codec.dispose();
+
+    final ByteData? pngData = await frame.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+    frame.image.dispose();
+    if (pngData == null) {
+      throw StateError('Failed to encode marker icon to PNG bytes.');
+    }
+    return BitmapDescriptor.fromBytes(pngData.buffer.asUint8List());
+  }
+
   Future<void> loadDishMarkers() async {
     final dishMarks = await IsarService.isar.dishMarks.where().findAll();
-    final Map<String, Marker> nextMarkers = <String, Marker>{};
+    final Map<int, Marker> nextMarkers = <int, Marker>{};
     int skippedWithoutLocation = 0;
 
     for (final dish in dishMarks) {
@@ -53,15 +99,12 @@ class _DishMapState extends State<DishMap> {
       }
 
       final marker = Marker(
-          position: LatLng(store.latitude!, store.longitude!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          zIndex: 10,
-          infoWindow: InfoWindow(
-            title: store.storeName,
-            snippet: dish.dishName,
-          ),
+        position: LatLng(store.latitude!, store.longitude!),
+        icon: _dishMarkerIcon,
+        zIndex: 10,
+        infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
       );
-      nextMarkers[marker.id] = marker;
+      nextMarkers[dish.id] = marker;
     }
 
     if (!mounted) {
@@ -86,6 +129,31 @@ class _DishMapState extends State<DishMap> {
     }
     _focusOnDishMarkersIfNeeded(Set<Marker>.of(_dishMarkerMap.values));
   }
+
+  // 增量添加新mark
+  void _addDishMarker(DishMark dish, {required BitmapDescriptor icon}) async {
+    await dish.store.load();
+    final store = dish.store.value;
+    if (store == null || store.latitude == null || store.longitude == null) {
+      return;
+    }
+
+    final marker = Marker(
+      position: LatLng(store.latitude!, store.longitude!),
+      icon: icon,
+      zIndex: 10,
+      infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _dishMarkerMap[dish.id] = marker;
+    });
+  }
+
+  void _playAppearAnimation(int dishId) {}
 
   void _onMapCreated(AMapController c) {
     _mapController = c;
@@ -236,7 +304,7 @@ class _DishMapState extends State<DishMap> {
           FloatingActionButton(
             heroTag: 'add_mark_fab',
             onPressed: () async {
-              await Navigator.push(
+              final DishMark? newDish = await Navigator.push<DishMark>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => CreateDishMark(
@@ -245,7 +313,10 @@ class _DishMapState extends State<DishMap> {
                   ),
                 ),
               );
-              loadDishMarkers();
+              if (newDish != null) {
+                _addDishMarker(newDish, icon: _dishMarkerIcon);
+                _playAppearAnimation(newDish.id);
+              }
             },
             foregroundColor: Colors.black,
             backgroundColor: Colors.white,
@@ -255,11 +326,15 @@ class _DishMapState extends State<DishMap> {
           FloatingActionButton(
             heroTag: 'view_mark_list',
             onPressed: () async {
-              await Navigator.push(
+              final DishMark? newDish = await Navigator.push<DishMark>(
                 context,
                 MaterialPageRoute(builder: (_) => DishMarkList()),
               );
-              loadDishMarkers();
+              // loadDishMarkers(); 使用增量添加，不再需要重载
+              if (newDish != null) {
+                _addDishMarker(newDish, icon: _dishMarkerIcon);
+                _playAppearAnimation(newDish.id);
+              }
             },
             foregroundColor: Colors.black,
             backgroundColor: Colors.white,
