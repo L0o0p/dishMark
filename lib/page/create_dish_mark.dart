@@ -173,14 +173,14 @@ class _CreateDishMarkState extends State<CreateDishMark> {
               maxLines: 3,
             ),
             const SizedBox(height: 8),
-            // Align(
-            //   alignment: Alignment.centerLeft,
-            //   child: Text(
-            //     widget.currentLocation == null
-            //         ? '当前位置: 未获取'
-            //         : '当前位置: ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
-            //   ),
-            // ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                widget.currentLocation == null
+                    ? '当前位置: 未获取'
+                    : '当前位置: ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
+              ),
+            ),
             ElevatedButton(onPressed: save, child: const Text("Save")),
           ],
         ),

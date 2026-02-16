@@ -1,6 +1,6 @@
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
 import 'package:amap_flutter_map_plus/amap_flutter_map_plus.dart';
-import 'package:dishmark/data/store.dart';
+import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/page/dish_list.dart';
 import 'package:dishmark/service/isar_service.dart';
@@ -16,21 +16,22 @@ class DishMap extends StatefulWidget {
 }
 
 class _DishMapState extends State<DishMap> {
-  Set<Marker> markers = {};
+  final Map<String, Marker> _dishMarkerMap = <String, Marker>{};
   AMapController? _mapController;
   Set<Polyline> polylines = {};
   Set<Polygon> polygons = {};
   String? _lastPoiName;
-  String? _lastTap;
+  LatLng? _lastTapLatLng;
   LatLng? _myLatLng;
   Marker? _myLocationMarker;
   bool _hasCenteredOnMyLocation = false;
+  bool _hasCenteredOnDishMarkers = false;
 
   @override
   void initState() {
     super.initState();
     _requestLocationPermission();
-    loadStores();
+    loadDishMarkers();
   }
 
   void _requestLocationPermission() async {
@@ -38,27 +39,85 @@ class _DishMapState extends State<DishMap> {
     debugPrint('locationWhenInUse permission: $status');
   }
 
-  Future<void> loadStores() async {
-    final stores = await IsarService.isar.stores.where().findAll();
+  Future<void> loadDishMarkers() async {
+    final dishMarks = await IsarService.isar.dishMarks.where().findAll();
+    final Map<String, Marker> nextMarkers = <String, Marker>{};
+    int skippedWithoutLocation = 0;
+
+    for (final dish in dishMarks) {
+      await dish.store.load();
+      final store = dish.store.value;
+      if (store == null || store.latitude == null || store.longitude == null) {
+        skippedWithoutLocation++;
+        continue;
+      }
+
+      final marker = Marker(
+          position: LatLng(store.latitude!, store.longitude!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+          zIndex: 10,
+          infoWindow: InfoWindow(
+            title: store.storeName,
+            snippet: dish.dishName,
+          ),
+      );
+      nextMarkers[marker.id] = marker;
+    }
 
     if (!mounted) {
       return;
     }
 
     setState(() {
-      markers = stores
-          .where((s) => s.latitude != null && s.longitude != null)
-          .map(
-            (store) => Marker(
-              position: LatLng(store.latitude!, store.longitude!),
-              infoWindow: InfoWindow(title: store.storeName),
-            ),
-          )
-          .toSet();
+      _dishMarkerMap
+        ..clear()
+        ..addAll(nextMarkers);
     });
+    debugPrint(
+      'Dish markers loaded: ${_dishMarkerMap.length}, '
+      'skipped without location: $skippedWithoutLocation',
+    );
+    for (final marker in _dishMarkerMap.values.take(5)) {
+      debugPrint(
+        'Dish marker at: '
+        '${marker.position.latitude.toStringAsFixed(5)}, '
+        '${marker.position.longitude.toStringAsFixed(5)}',
+      );
+    }
+    _focusOnDishMarkersIfNeeded(Set<Marker>.of(_dishMarkerMap.values));
   }
 
-  void _onMapCreated(AMapController c) => _mapController = c;
+  void _onMapCreated(AMapController c) {
+    _mapController = c;
+    debugPrint('DishMap onMapCreated');
+    _focusOnDishMarkersIfNeeded(Set<Marker>.of(_dishMarkerMap.values));
+  }
+
+  void _focusOnDishMarkersIfNeeded(Set<Marker> dishMarkers) {
+    if (_hasCenteredOnDishMarkers) {
+      return;
+    }
+    if (dishMarkers.isEmpty || _mapController == null) {
+      debugPrint(
+        'Skip focus dish markers: empty=${dishMarkers.isEmpty}, '
+        'controllerNull=${_mapController == null}',
+      );
+      return;
+    }
+    _hasCenteredOnDishMarkers = true;
+    final target = dishMarkers.first.position;
+    debugPrint(
+      'Auto focus first dish marker: '
+      '${target.latitude.toStringAsFixed(5)}, '
+      '${target.longitude.toStringAsFixed(5)}',
+    );
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      _mapController?.moveCamera(
+        CameraUpdate.newLatLngZoom(target, 16),
+        animated: true,
+      );
+    });
+  }
 
   void _goToMyLocation() {
     final LatLng? latLng = _myLatLng;
@@ -75,7 +134,7 @@ class _DishMapState extends State<DishMap> {
   @override
   Widget build(BuildContext context) {
     final Set<Marker> allMarkers = <Marker>{
-      ...markers,
+      ..._dishMarkerMap.values,
       if (_myLocationMarker != null) _myLocationMarker!,
     };
 
@@ -92,6 +151,7 @@ class _DishMapState extends State<DishMap> {
                 _myLocationMarker = (_myLocationMarker == null)
                     ? Marker(
                         position: latLng,
+                        zIndex: 0,
                         icon: BitmapDescriptor.defaultMarkerWithHue(
                           BitmapDescriptor.hueAzure,
                         ),
@@ -109,8 +169,7 @@ class _DishMapState extends State<DishMap> {
             },
             onTap: (latLng) {
               setState(() {
-                _lastTap =
-                    '${latLng.latitude.toStringAsFixed(5)}, ${latLng.longitude.toStringAsFixed(5)}';
+                _lastTapLatLng = latLng;
               });
             },
             myLocationStyleOptions: MyLocationStyleOptions(
@@ -154,7 +213,7 @@ class _DishMapState extends State<DishMap> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  'POI: ${_lastPoiName ?? '（暂无）'}\nTap: ${_lastTap ?? '（暂无）'}\nMe: ${_myLatLng == null ? '（暂无）' : '${_myLatLng!.latitude.toStringAsFixed(5)}, ${_myLatLng!.longitude.toStringAsFixed(5)}'}',
+                  'POI: ${_lastPoiName ?? '（暂无）'}\nTap: ${_lastTapLatLng == null ? '（暂无）' : '${_lastTapLatLng!.latitude.toStringAsFixed(5)}, ${_lastTapLatLng!.longitude.toStringAsFixed(5)}'}\nMe: ${_myLatLng == null ? '（暂无）' : '${_myLatLng!.latitude.toStringAsFixed(5)}, ${_myLatLng!.longitude.toStringAsFixed(5)}'}',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
@@ -181,12 +240,12 @@ class _DishMapState extends State<DishMap> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => CreateDishMark(
-                    currentLocation: _myLatLng,
+                    currentLocation: _lastTapLatLng ?? _myLatLng,
                     initialStoreName: _lastPoiName,
                   ),
                 ),
               );
-              loadStores();
+              loadDishMarkers();
             },
             foregroundColor: Colors.black,
             backgroundColor: Colors.white,
@@ -200,7 +259,7 @@ class _DishMapState extends State<DishMap> {
                 context,
                 MaterialPageRoute(builder: (_) => DishMarkList()),
               );
-              loadStores();
+              loadDishMarkers();
             },
             foregroundColor: Colors.black,
             backgroundColor: Colors.white,
