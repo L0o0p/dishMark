@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -8,6 +9,7 @@ import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/page/dish_list.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/widgets/dialogs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
@@ -367,6 +369,8 @@ class _DishMapState extends State<DishMap> {
       ..._dishMarkerMap.values,
       if (_myLocationMarker != null) _myLocationMarker!,
     };
+    final bool hasOnlyMyLocationMarker =
+        allMarkers.isEmpty || (allMarkers.length == 1 && _myLocationMarker != null);
 
     return Scaffold(
       body: Stack(
@@ -428,6 +432,12 @@ class _DishMapState extends State<DishMap> {
             ),
             markers: allMarkers,
           ),
+          if (hasOnlyMyLocationMarker)
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: AppEmptyHint(message: "你还没有记录任何美食\n快去 mark 你的第一个吧 🍜"),
+              ),
+            ),
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
