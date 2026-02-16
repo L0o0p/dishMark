@@ -23,8 +23,71 @@ class DishMap extends StatefulWidget {
 class _DishMapState extends State<DishMap> {
   static const String _dishIconAssetPath = 'assets/logo.jpg';
   static const int _dishIconSizePx = 72;
+  static const List<double> _appearScales = <double>[
+    0.20,
+    0.34,
+    0.48,
+    0.64,
+    0.80,
+    0.95,
+    1.06,
+    1.02,
+    1.00,
+  ];
+  static const List<int> _appearFrameDelaysMs = <int>[
+    45,
+    45,
+    45,
+    45,
+    45,
+    45,
+    70,
+    70,
+    90,
+  ];
+  static const List<double> _disappearScales = <double>[
+    1.00,
+    1.05,
+    1.10,
+    1.06,
+    1.00,
+    0.95,
+    0.88,
+    0.80,
+    0.70,
+    0.64,
+    0.54,
+    0.48,
+    0.40,
+    0.34,
+    0.28,
+    0.20,
+    0.14,
+    0.10,
+  ];
+  static const List<int> _disappearFrameDelaysMs = <int>[
+    90,
+    90,
+    90,
+    80,
+    80,
+    75,
+    70,
+    70,
+    65,
+    60,
+    55,
+    50,
+    45,
+    45,
+    45,
+    45,
+    45,
+    120,
+  ];
 
   final Map<int, Marker> _dishMarkerMap = <int, Marker>{};
+  final Set<int> _pendingDeletedDishIds = <int>{};
   AMapController? _mapController;
   Set<Polyline> polylines = {};
   Set<Polygon> polygons = {};
@@ -47,11 +110,30 @@ class _DishMapState extends State<DishMap> {
     _onDeletedDishChanged = () {
       final id = DishEvents.deletedDishId.value;
       if (id != null) {
-        _removeDishMarker(id);
+        if (_isMapRouteVisible()) {
+          unawaited(_removeDishMarker(id));
+        } else {
+          _pendingDeletedDishIds.add(id);
+        }
         DishEvents.deletedDishId.value = null;
       }
     };
     DishEvents.deletedDishId.addListener(_onDeletedDishChanged);
+  }
+
+  bool _isMapRouteVisible() {
+    return ModalRoute.of(context)?.isCurrent ?? true;
+  }
+
+  void _consumePendingDeletedMarkersIfVisible() {
+    if (!_isMapRouteVisible() || _pendingDeletedDishIds.isEmpty) {
+      return;
+    }
+    final List<int> pendingIds = List<int>.from(_pendingDeletedDishIds);
+    _pendingDeletedDishIds.clear();
+    for (final int dishId in pendingIds) {
+      unawaited(_removeDishMarker(dishId));
+    }
   }
 
   void _requestLocationPermission() async {
@@ -156,27 +238,14 @@ class _DishMapState extends State<DishMap> {
   }
 
   Future<void> _playAppearAnimation(DishMark dish) async {
-    const List<double> scales = <double>[
-      0.20,
-      0.34,
-      0.48,
-      0.64,
-      0.80,
-      0.95,
-      1.06,
-      1.02,
-      1.00,
-    ];
-    const List<int> frameDelaysMs = <int>[45, 45, 45, 45, 45, 45, 70, 70, 90];
-
     await dish.store.load();
     final store = dish.store.value;
     if (store == null || store.latitude == null || store.longitude == null) {
       return;
     }
 
-    for (int i = 0; i < scales.length; i++) {
-      final double scale = scales[i];
+    for (int i = 0; i < _appearScales.length; i++) {
+      final double scale = _appearScales[i];
       final BitmapDescriptor icon = await _getDishMarkerIconByScale(scale);
 
       final marker = Marker(
@@ -193,7 +262,9 @@ class _DishMapState extends State<DishMap> {
         _dishMarkerMap[dish.id] = marker;
       });
 
-      await Future<void>.delayed(Duration(milliseconds: frameDelaysMs[i]));
+      await Future<void>.delayed(
+        Duration(milliseconds: _appearFrameDelaysMs[i]),
+      );
     }
   }
 
@@ -242,9 +313,32 @@ class _DishMapState extends State<DishMap> {
   }
 
   // 删除mark
-  void _removeDishMarker(int id) {
-    if (!_dishMarkerMap.containsKey(id)) {
+  Future<void> _removeDishMarker(int id) async {
+    final Marker? marker = _dishMarkerMap[id];
+    if (marker == null) {
       debugPrint('Dish marker not found for dish id: $id');
+      return;
+    }
+
+    for (int i = 0; i < _disappearScales.length; i++) {
+      if (!mounted || !_dishMarkerMap.containsKey(id)) {
+        return;
+      }
+      final BitmapDescriptor icon = await _getDishMarkerIconByScale(
+        _disappearScales[i],
+      );
+      if (!mounted || !_dishMarkerMap.containsKey(id)) {
+        return;
+      }
+      setState(() {
+        _dishMarkerMap[id] = marker.copyWith(iconParam: icon);
+      });
+      await Future<void>.delayed(
+        Duration(milliseconds: _disappearFrameDelaysMs[i]),
+      );
+    }
+
+    if (!mounted) {
       return;
     }
     setState(() {
@@ -260,6 +354,15 @@ class _DishMapState extends State<DishMap> {
 
   @override
   Widget build(BuildContext context) {
+    if (_pendingDeletedDishIds.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _consumePendingDeletedMarkersIfVisible();
+      });
+    }
+
     final Set<Marker> allMarkers = <Marker>{
       ..._dishMarkerMap.values,
       if (_myLocationMarker != null) _myLocationMarker!,
@@ -388,6 +491,7 @@ class _DishMapState extends State<DishMap> {
                 context,
                 MaterialPageRoute(builder: (_) => DishMarkList()),
               );
+              _consumePendingDeletedMarkersIfVisible();
               // loadDishMarkers(); 使用增量添加，不再需要重载
               if (newDish != null) {
                 await _playAppearAnimation(newDish);
