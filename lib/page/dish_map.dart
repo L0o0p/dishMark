@@ -331,12 +331,12 @@ class _DishMapState extends State<DishMap> {
       zIndex: 10,
       infoWindow: InfoWindow(title: storeName, snippet: dish.dishName),
       onTap: (_) {
-        unawaited(_showDishDraggableSheet());
+        unawaited(_showDishDraggableSheet(dish.id));
       },
     );
   }
 
-  Future<void> _showDishDraggableSheet() async {
+  Future<void> _showDishDraggableSheet(int dishId) async {
     if (!mounted || _isDishSheetOpen) {
       return;
     }
@@ -346,10 +346,14 @@ class _DishMapState extends State<DishMap> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
+        barrierColor: Colors.transparent,
         elevation: 0,
         enableDrag: false,
         showDragHandle: false,
-        builder: (_) => const DraggableScrollableSheetExample(),
+        builder: (_) => ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          child: DraggableScrollableSheetExample(dishId: dishId),
+        ),
       );
     } finally {
       _isDishSheetOpen = false;
@@ -448,6 +452,9 @@ class _DishMapState extends State<DishMap> {
               setState(() {
                 _lastTapLatLng = latLng;
               });
+              if (_isDishSheetOpen) {
+                Navigator.of(context).maybePop();
+              }
             },
             myLocationStyleOptions: MyLocationStyleOptions(
               true,
