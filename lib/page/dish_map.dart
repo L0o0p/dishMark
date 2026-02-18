@@ -10,6 +10,7 @@ import 'package:dishmark/page/dish_list.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/widgets/dialogs.dart';
+import 'package:dishmark/widgets/draggable_scrollable_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
@@ -102,6 +103,7 @@ class _DishMapState extends State<DishMap> {
   Marker? _myLocationMarker;
   bool _hasCenteredOnMyLocation = false;
   bool _hasCenteredOnDishMarkers = false;
+  bool _isDishSheetOpen = false;
   late final VoidCallback _onDeletedDishChanged;
 
   @override
@@ -207,11 +209,12 @@ class _DishMapState extends State<DishMap> {
         continue;
       }
 
-      final marker = Marker(
-        position: LatLng(store.latitude!, store.longitude!),
+      final marker = _buildDishMarker(
+        dish: dish,
+        latitude: store.latitude!,
+        longitude: store.longitude!,
+        storeName: store.storeName,
         icon: _dishMarkerIcon,
-        zIndex: 10,
-        infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
       );
       nextMarkers[dish.id] = marker;
     }
@@ -250,11 +253,12 @@ class _DishMapState extends State<DishMap> {
       final double scale = _appearScales[i];
       final BitmapDescriptor icon = await _getDishMarkerIconByScale(scale);
 
-      final marker = Marker(
-        position: LatLng(store.latitude!, store.longitude!),
+      final marker = _buildDishMarker(
+        dish: dish,
+        latitude: store.latitude!,
+        longitude: store.longitude!,
+        storeName: store.storeName,
         icon: icon,
-        zIndex: 10,
-        infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
       );
 
       if (!mounted) {
@@ -314,6 +318,44 @@ class _DishMapState extends State<DishMap> {
     );
   }
 
+  Marker _buildDishMarker({
+    required DishMark dish,
+    required double latitude,
+    required double longitude,
+    required String storeName,
+    required BitmapDescriptor icon,
+  }) {
+    return Marker(
+      position: LatLng(latitude, longitude),
+      icon: icon,
+      zIndex: 10,
+      infoWindow: InfoWindow(title: storeName, snippet: dish.dishName),
+      onTap: (_) {
+        unawaited(_showDishDraggableSheet());
+      },
+    );
+  }
+
+  Future<void> _showDishDraggableSheet() async {
+    if (!mounted || _isDishSheetOpen) {
+      return;
+    }
+    _isDishSheetOpen = true;
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        enableDrag: false,
+        showDragHandle: false,
+        builder: (_) => const DraggableScrollableSheetExample(),
+      );
+    } finally {
+      _isDishSheetOpen = false;
+    }
+  }
+
   // 删除mark
   Future<void> _removeDishMarker(int id) async {
     final Marker? marker = _dishMarkerMap[id];
@@ -370,7 +412,8 @@ class _DishMapState extends State<DishMap> {
       if (_myLocationMarker != null) _myLocationMarker!,
     };
     final bool hasOnlyMyLocationMarker =
-        allMarkers.isEmpty || (allMarkers.length == 1 && _myLocationMarker != null);
+        allMarkers.isEmpty ||
+        (allMarkers.length == 1 && _myLocationMarker != null);
 
     return Scaffold(
       body: Stack(
