@@ -1,5 +1,6 @@
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
+import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
@@ -59,6 +60,8 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     await IsarService.isar.writeTxn(() async {
       await IsarService.isar.dishMarks.delete(widget.markId);
     });
+    // 事件通知
+    DishEvents.deletedDishId.value = widget.markId;
 
     if (!mounted) return;
     Navigator.of(context).pop(true);

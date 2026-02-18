@@ -11,7 +11,7 @@ void main() async {
   await IsarService.init();
 
   // 临时测试代码：写入测试数据
-  await _insertTestData();
+  // await _insertTestData();
 
   // 临时测试代码：读取测试数据
   await _readTestData();
@@ -20,34 +20,34 @@ void main() async {
 }
 
 /// 临时测试函数：插入测试数据
-Future<void> _insertTestData() async {
-  await IsarService.isar.writeTxn(() async {
-    final isar = IsarService.isar;
+// Future<void> _insertTestData() async {
+//   await IsarService.isar.writeTxn(() async {
+//     final isar = IsarService.isar;
 
-    // 创建 Store 对象
-    final store = Store()
-      ..storeName = "Test Store"
-      ..queueLevel = QueueLevel.noQueue
-      ..createdAt = DateTime.now()
-      ..updatedAt = DateTime.now();
+//     // 创建 Store 对象
+//     final store = Store()
+//       ..storeName = "Test Store"
+//       ..queueLevel = QueueLevel.noQueue
+//       ..createdAt = DateTime.now()
+//       ..updatedAt = DateTime.now();
 
-    // 保存 Store 并获取其 ID
-    await isar.stores.put(store);
+//     // 保存 Store 并获取其 ID
+//     await isar.stores.put(store);
 
-    // 创建 DishMark 对象
-    final dishMark = DishMark()
-      ..dishName = "Test Dish"
-      ..flavors = [Flavor.spicy]
-      ..createdAt = DateTime.now()
-      ..updatedAt = DateTime.now();
+//     // 创建 DishMark 对象
+//     final dishMark = DishMark()
+//       ..dishName = "Test Dish"
+//       ..flavors = [Flavor.spicy]
+//       ..createdAt = DateTime.now()
+//       ..updatedAt = DateTime.now();
 
-    dishMark.store.value = store;
+//     dishMark.store.value = store;
 
-    // 保存 DishMark
-    await isar.dishMarks.put(dishMark);
-    await dishMark.store.save();
-  });
-}
+//     // 保存 DishMark
+//     await isar.dishMarks.put(dishMark);
+//     await dishMark.store.save();
+//   });
+// }
 
 /// 临时测试函数：读取测试数据
 Future<void> _readTestData() async {

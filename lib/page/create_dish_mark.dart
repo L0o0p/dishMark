@@ -10,7 +10,11 @@ class CreateDishMark extends StatefulWidget {
   final LatLng? currentLocation;
   final String? initialStoreName;
 
-  const CreateDishMark({super.key, this.currentLocation, this.initialStoreName});
+  const CreateDishMark({
+    super.key,
+    this.currentLocation,
+    this.initialStoreName,
+  });
 
   @override
   State<CreateDishMark> createState() => _CreateDishMarkState();
@@ -22,6 +26,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   final TextEditingController priceController = TextEditingController();
   final TextEditingController experienceController = TextEditingController();
   final TextEditingController flavorsController = TextEditingController();
+  DishMark? newDishMark;
   List<Flavor> selectedFlavors = [];
 
   @override
@@ -122,9 +127,14 @@ class _CreateDishMarkState extends State<CreateDishMark> {
 
       await IsarService.isar.dishMarks.put(dish);
       await dish.store.save();
+      newDishMark = dish;
     });
 
-    Navigator.pop(context, true);
+    if (newDishMark != null) {
+      Navigator.pop(context, newDishMark);
+    } else {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -147,7 +157,9 @@ class _CreateDishMarkState extends State<CreateDishMark> {
           children: [
             TextField(
               controller: storeController,
-              decoration: const InputDecoration(labelText: "Store Name | Location"),
+              decoration: const InputDecoration(
+                labelText: "Store Name | Location",
+              ),
             ),
             TextField(
               controller: dishController,

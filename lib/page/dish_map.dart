@@ -1,10 +1,17 @@
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
 import 'package:amap_flutter_map_plus/amap_flutter_map_plus.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/page/dish_list.dart';
+import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/widgets/dialogs.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -16,22 +23,119 @@ class DishMap extends StatefulWidget {
 }
 
 class _DishMapState extends State<DishMap> {
-  final Map<String, Marker> _dishMarkerMap = <String, Marker>{};
+  static const String _dishIconAssetPath = 'assets/logo.jpg';
+  static const int _dishIconSizePx = 72;
+  static const List<double> _appearScales = <double>[
+    0.20,
+    0.34,
+    0.48,
+    0.64,
+    0.80,
+    0.95,
+    1.06,
+    1.02,
+    1.00,
+  ];
+  static const List<int> _appearFrameDelaysMs = <int>[
+    45,
+    45,
+    45,
+    45,
+    45,
+    45,
+    70,
+    70,
+    90,
+  ];
+  static const List<double> _disappearScales = <double>[
+    1.00,
+    1.05,
+    1.10,
+    1.06,
+    1.00,
+    0.95,
+    0.88,
+    0.80,
+    0.70,
+    0.64,
+    0.54,
+    0.48,
+    0.40,
+    0.34,
+    0.28,
+    0.20,
+    0.14,
+    0.10,
+  ];
+  static const List<int> _disappearFrameDelaysMs = <int>[
+    90,
+    90,
+    90,
+    80,
+    80,
+    75,
+    70,
+    70,
+    65,
+    60,
+    55,
+    50,
+    45,
+    45,
+    45,
+    45,
+    45,
+    120,
+  ];
+
+  final Map<int, Marker> _dishMarkerMap = <int, Marker>{};
+  final Set<int> _pendingDeletedDishIds = <int>{};
   AMapController? _mapController;
   Set<Polyline> polylines = {};
   Set<Polygon> polygons = {};
+  BitmapDescriptor _dishMarkerIcon = BitmapDescriptor.defaultMarker;
+  final Map<int, BitmapDescriptor> _dishMarkerIconCache =
+      <int, BitmapDescriptor>{};
   String? _lastPoiName;
   LatLng? _lastTapLatLng;
   LatLng? _myLatLng;
   Marker? _myLocationMarker;
   bool _hasCenteredOnMyLocation = false;
   bool _hasCenteredOnDishMarkers = false;
+  late final VoidCallback _onDeletedDishChanged;
 
   @override
   void initState() {
     super.initState();
     _requestLocationPermission();
-    loadDishMarkers();
+    _initDishMarkerIcon();
+    _onDeletedDishChanged = () {
+      final id = DishEvents.deletedDishId.value;
+      if (id != null) {
+        if (_isMapRouteVisible()) {
+          unawaited(_removeDishMarker(id));
+        } else {
+          _pendingDeletedDishIds.add(id);
+        }
+        DishEvents.deletedDishId.value = null;
+      }
+    };
+    DishEvents.deletedDishId.addListener(_onDeletedDishChanged);
+  }
+
+  bool _isMapRouteVisible() {
+    return ModalRoute.of(context)?.isCurrent ?? true;
+  }
+
+  void _consumePendingDeletedMarkersIfVisible() {
+    if (!_isMapRouteVisible() || _pendingDeletedDishIds.isEmpty) {
+      return;
+    }
+    final List<int> pendingIds = List<int>.from(_pendingDeletedDishIds);
+    _pendingDeletedDishIds.clear();
+    for (final int dishId in pendingIds) {
+      unawaited(_removeDishMarker(dishId));
+    }
   }
 
   void _requestLocationPermission() async {
@@ -39,9 +143,60 @@ class _DishMapState extends State<DishMap> {
     debugPrint('locationWhenInUse permission: $status');
   }
 
+  Future<void> _initDishMarkerIcon() async {
+    try {
+      _dishMarkerIcon = await _getDishMarkerIconByScale(1.0);
+    } catch (e) {
+      debugPrint('Failed to build resized marker icon: $e');
+      _dishMarkerIcon = BitmapDescriptor.defaultMarker;
+    }
+    await loadDishMarkers();
+  }
+
+  Future<BitmapDescriptor> _getDishMarkerIconByScale(double scale) async {
+    final int targetSizePx =
+        ((_dishIconSizePx * scale).round()).clamp(1, 1024) as int;
+    final BitmapDescriptor? cachedIcon = _dishMarkerIconCache[targetSizePx];
+    if (cachedIcon != null) {
+      return cachedIcon;
+    }
+
+    final BitmapDescriptor icon = await _buildResizedMarkerIcon(
+      assetPath: _dishIconAssetPath,
+      targetSizePx: targetSizePx,
+    );
+    _dishMarkerIconCache[targetSizePx] = icon;
+    return icon;
+  }
+
+  Future<BitmapDescriptor> _buildResizedMarkerIcon({
+    required String assetPath,
+    required int targetSizePx,
+  }) async {
+    final ByteData byteData = await rootBundle.load(assetPath);
+    final Uint8List rawBytes = byteData.buffer.asUint8List();
+
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      rawBytes,
+      targetWidth: targetSizePx,
+      targetHeight: targetSizePx,
+    );
+    final ui.FrameInfo frame = await codec.getNextFrame();
+    codec.dispose();
+
+    final ByteData? pngData = await frame.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+    frame.image.dispose();
+    if (pngData == null) {
+      throw StateError('Failed to encode marker icon to PNG bytes.');
+    }
+    return BitmapDescriptor.fromBytes(pngData.buffer.asUint8List());
+  }
+
   Future<void> loadDishMarkers() async {
     final dishMarks = await IsarService.isar.dishMarks.where().findAll();
-    final Map<String, Marker> nextMarkers = <String, Marker>{};
+    final Map<int, Marker> nextMarkers = <int, Marker>{};
     int skippedWithoutLocation = 0;
 
     for (final dish in dishMarks) {
@@ -53,15 +208,12 @@ class _DishMapState extends State<DishMap> {
       }
 
       final marker = Marker(
-          position: LatLng(store.latitude!, store.longitude!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-          zIndex: 10,
-          infoWindow: InfoWindow(
-            title: store.storeName,
-            snippet: dish.dishName,
-          ),
+        position: LatLng(store.latitude!, store.longitude!),
+        icon: _dishMarkerIcon,
+        zIndex: 10,
+        infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
       );
-      nextMarkers[marker.id] = marker;
+      nextMarkers[dish.id] = marker;
     }
 
     if (!mounted) {
@@ -85,6 +237,37 @@ class _DishMapState extends State<DishMap> {
       );
     }
     _focusOnDishMarkersIfNeeded(Set<Marker>.of(_dishMarkerMap.values));
+  }
+
+  Future<void> _playAppearAnimation(DishMark dish) async {
+    await dish.store.load();
+    final store = dish.store.value;
+    if (store == null || store.latitude == null || store.longitude == null) {
+      return;
+    }
+
+    for (int i = 0; i < _appearScales.length; i++) {
+      final double scale = _appearScales[i];
+      final BitmapDescriptor icon = await _getDishMarkerIconByScale(scale);
+
+      final marker = Marker(
+        position: LatLng(store.latitude!, store.longitude!),
+        icon: icon,
+        zIndex: 10,
+        infoWindow: InfoWindow(title: store.storeName, snippet: dish.dishName),
+      );
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _dishMarkerMap[dish.id] = marker;
+      });
+
+      await Future<void>.delayed(
+        Duration(milliseconds: _appearFrameDelaysMs[i]),
+      );
+    }
   }
 
   void _onMapCreated(AMapController c) {
@@ -131,12 +314,63 @@ class _DishMapState extends State<DishMap> {
     );
   }
 
+  // 删除mark
+  Future<void> _removeDishMarker(int id) async {
+    final Marker? marker = _dishMarkerMap[id];
+    if (marker == null) {
+      debugPrint('Dish marker not found for dish id: $id');
+      return;
+    }
+
+    for (int i = 0; i < _disappearScales.length; i++) {
+      if (!mounted || !_dishMarkerMap.containsKey(id)) {
+        return;
+      }
+      final BitmapDescriptor icon = await _getDishMarkerIconByScale(
+        _disappearScales[i],
+      );
+      if (!mounted || !_dishMarkerMap.containsKey(id)) {
+        return;
+      }
+      setState(() {
+        _dishMarkerMap[id] = marker.copyWith(iconParam: icon);
+      });
+      await Future<void>.delayed(
+        Duration(milliseconds: _disappearFrameDelaysMs[i]),
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _dishMarkerMap.remove(id);
+    });
+  }
+
+  @override
+  void dispose() {
+    DishEvents.deletedDishId.removeListener(_onDeletedDishChanged);
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_pendingDeletedDishIds.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        _consumePendingDeletedMarkersIfVisible();
+      });
+    }
+
     final Set<Marker> allMarkers = <Marker>{
       ..._dishMarkerMap.values,
       if (_myLocationMarker != null) _myLocationMarker!,
     };
+    final bool hasOnlyMyLocationMarker =
+        allMarkers.isEmpty || (allMarkers.length == 1 && _myLocationMarker != null);
 
     return Scaffold(
       body: Stack(
@@ -198,6 +432,12 @@ class _DishMapState extends State<DishMap> {
             ),
             markers: allMarkers,
           ),
+          if (hasOnlyMyLocationMarker)
+            const Positioned.fill(
+              child: IgnorePointer(
+                child: AppEmptyHint(message: "你还没有记录任何美食\n快去 mark 你的第一个吧 🍜"),
+              ),
+            ),
           SafeArea(
             child: Align(
               alignment: Alignment.topCenter,
@@ -236,7 +476,7 @@ class _DishMapState extends State<DishMap> {
           FloatingActionButton(
             heroTag: 'add_mark_fab',
             onPressed: () async {
-              await Navigator.push(
+              final DishMark? newDish = await Navigator.push<DishMark>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => CreateDishMark(
@@ -245,7 +485,9 @@ class _DishMapState extends State<DishMap> {
                   ),
                 ),
               );
-              loadDishMarkers();
+              if (newDish != null) {
+                await _playAppearAnimation(newDish);
+              }
             },
             foregroundColor: Colors.black,
             backgroundColor: Colors.white,
@@ -255,11 +497,15 @@ class _DishMapState extends State<DishMap> {
           FloatingActionButton(
             heroTag: 'view_mark_list',
             onPressed: () async {
-              await Navigator.push(
+              final DishMark? newDish = await Navigator.push<DishMark>(
                 context,
                 MaterialPageRoute(builder: (_) => DishMarkList()),
               );
-              loadDishMarkers();
+              _consumePendingDeletedMarkersIfVisible();
+              // loadDishMarkers(); 使用增量添加，不再需要重载
+              if (newDish != null) {
+                await _playAppearAnimation(newDish);
+              }
             },
             foregroundColor: Colors.black,
             backgroundColor: Colors.white,
