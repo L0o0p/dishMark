@@ -336,6 +336,25 @@ class _DishMapState extends State<DishMap> {
     );
   }
 
+  Future<void> _focusDishMarkerAndOpenSheet(int dishId) async {
+    Marker? marker = _dishMarkerMap[dishId];
+    if (marker == null) {
+      await loadDishMarkers();
+      marker = _dishMarkerMap[dishId];
+    }
+    if (!mounted || marker == null) {
+      debugPrint('Dish marker not found for focus, id=$dishId');
+      return;
+    }
+
+    _mapController?.moveCamera(
+      CameraUpdate.newLatLngZoom(marker.position, 17),
+      animated: true,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    await _showDishDraggableSheet(dishId);
+  }
+
   Future<void> _showDishDraggableSheet(int dishId) async {
     if (!mounted || _isDishSheetOpen) {
       return;
@@ -547,14 +566,13 @@ class _DishMapState extends State<DishMap> {
           FloatingActionButton(
             heroTag: 'view_mark_list',
             onPressed: () async {
-              final DishMark? newDish = await Navigator.push<DishMark>(
+              final int? selectedDishId = await Navigator.push<int>(
                 context,
                 MaterialPageRoute(builder: (_) => DishMarkList()),
               );
               _consumePendingDeletedMarkersIfVisible();
-              // loadDishMarkers(); 使用增量添加，不再需要重载
-              if (newDish != null) {
-                await _playAppearAnimation(newDish);
+              if (selectedDishId != null) {
+                await _focusDishMarkerAndOpenSheet(selectedDishId);
               }
             },
             foregroundColor: Colors.black,
