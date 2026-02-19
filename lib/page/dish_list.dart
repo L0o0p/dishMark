@@ -57,13 +57,19 @@ class _DishMarkListState extends State<DishMarkList> {
 
           return ListTile(
             title: Text('${mark.id}. ${mark.dishName}'),
-            onTap: () async {
+            onTap: () {
+              Navigator.pop<int>(context, mark.id);
+            },
+            onLongPress: () async {
               final deleted = await Navigator.push<bool>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => DishMarkDetail(markId: mark.id),
                 ),
               );
+              if (!mounted) {
+                return;
+              }
               if (deleted == true) {
                 loadData();
               }
