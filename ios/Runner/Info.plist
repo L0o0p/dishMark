@@ -31,6 +31,8 @@
 	<string>需要定位以展示附近店铺</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>需要定位以展示附近店铺</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>需要访问相册以选择菜品图片</string>
 
 	<key>UIApplicationSceneManifest</key>
 	<dict>
