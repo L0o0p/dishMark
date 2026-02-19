@@ -15,6 +15,13 @@ class DishMarkList extends StatefulWidget {
 class _DishMarkListState extends State<DishMarkList> {
   List<DishMark> marks = [];
 
+  String _formatDate(DateTime? value) {
+    if (value == null) {
+      return 'null';
+    }
+    return value.toLocal().toIso8601String();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +31,9 @@ class _DishMarkListState extends State<DishMarkList> {
   Future<void> loadData() async {
     final data = await IsarService.isar.dishMarks.where().findAll();
     await Future.wait(data.map((m) => m.store.load()));
+    if (!mounted) {
+      return;
+    }
     setState(() {
       marks = data;
     });
@@ -39,8 +49,14 @@ class _DishMarkListState extends State<DishMarkList> {
         itemCount: marks.length,
         itemBuilder: (context, index) {
           final mark = marks[index];
+          final store = mark.store.value;
+          final flavors =
+              mark.flavors.isEmpty
+                  ? '(empty)'
+                  : mark.flavors.map((f) => f.name).join(', ');
+
           return ListTile(
-            title: Text(mark.dishName),
+            title: Text('${mark.id}. ${mark.dishName}'),
             onTap: () async {
               final deleted = await Navigator.push<bool>(
                 context,
@@ -56,10 +72,26 @@ class _DishMarkListState extends State<DishMarkList> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Store: ${mark.store.value?.storeName ?? '(no store)'}"),
-                Text("Price Level: ${mark.priceLevel ?? 'N/A'}"),
-                Text("Flavors: ${mark.flavors.map((f) => f.name).join(', ')}"),
-                Text("Created: ${mark.createdAt.toLocal()}"),
+                Text('id: ${mark.id}'),
+                Text('dishName: ${mark.dishName}'),
+                Text('storeId: ${store?.id ?? 'null'}'),
+                Text('storeName: ${store?.storeName ?? 'null'}'),
+                Text('storeQueueLevel: ${store?.queueLevel.name ?? 'null'}'),
+                Text('storeLatitude: ${store?.latitude ?? 'null'}'),
+                Text('storeLongitude: ${store?.longitude ?? 'null'}'),
+                Text('storeCreatedAt: ${_formatDate(store?.createdAt)}'),
+                Text('storeUpdatedAt: ${_formatDate(store?.updatedAt)}'),
+                Text('storeDeletedAt: ${_formatDate(store?.deletedAt)}'),
+                Text('priceLevel: ${mark.priceLevel ?? 'null'}'),
+                Text('flavors: $flavors'),
+                Text('experienceNote: ${mark.experienceNote ?? 'null'}'),
+                Text(
+                  'imagePath: ${mark.imagePath.isEmpty ? '(empty)' : mark.imagePath}',
+                ),
+                Text('createdAt: ${_formatDate(mark.createdAt)}'),
+                Text('updatedAt: ${_formatDate(mark.updatedAt)}'),
+                Text('deletedAt: ${_formatDate(mark.deletedAt)}'),
+                Text('lastTastedAt: ${_formatDate(mark.lastTastedAt)}'),
               ],
             ),
           );
