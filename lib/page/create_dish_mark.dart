@@ -31,6 +31,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   final ImagePicker _imagePicker = ImagePicker();
   DishMark? newDishMark;
   List<Flavor> selectedFlavors = [];
+  QueueLevel _selectedQueueLevel = QueueLevel.noQueue;
   String? _selectedImagePath;
   bool _isPickingImage = false;
 
@@ -76,6 +77,19 @@ class _CreateDishMarkState extends State<CreateDishMark> {
         return '新鲜';
       case Flavor.greasy:
         return '油腻';
+    }
+  }
+
+  String _getQueueLevelLabel(QueueLevel level) {
+    switch (level) {
+      case QueueLevel.noQueue:
+        return '几乎不用排队';
+      case QueueLevel.within30Min:
+        return '小于 30 分钟';
+      case QueueLevel.over1Hour:
+        return '大于 1 小时';
+      case QueueLevel.reservationNeeded:
+        return '建议预约';
     }
   }
 
@@ -167,7 +181,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
       final storeNow = DateTime.now();
       final store = Store()
         ..storeName = storeController.text
-        ..queueLevel = QueueLevel.noQueue
+        ..queueLevel = _selectedQueueLevel
         ..latitude = currentLocation.latitude
         ..longitude = currentLocation.longitude
         ..createdAt = storeNow
@@ -228,6 +242,27 @@ class _CreateDishMarkState extends State<CreateDishMark> {
               TextField(
                 controller: dishController,
                 decoration: const InputDecoration(labelText: "Dish Name"),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<QueueLevel>(
+                value: _selectedQueueLevel,
+                decoration: const InputDecoration(
+                  labelText: "排队时长 (Queue Level)",
+                ),
+                items: QueueLevel.values.map((level) {
+                  return DropdownMenuItem<QueueLevel>(
+                    value: level,
+                    child: Text(_getQueueLevelLabel(level)),
+                  );
+                }).toList(),
+                onChanged: (QueueLevel? value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _selectedQueueLevel = value;
+                  });
+                },
               ),
               const SizedBox(height: 12),
               Row(

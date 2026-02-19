@@ -17,6 +17,21 @@ class DishMarkDetail extends StatefulWidget {
 class _DishMarkDetailState extends State<DishMarkDetail> {
   DishMark? mark;
 
+  String _formatQueueLevel(QueueLevel? level) {
+    switch (level) {
+      case QueueLevel.noQueue:
+        return '几乎不用排队';
+      case QueueLevel.within30Min:
+        return '小于 30 分钟';
+      case QueueLevel.over1Hour:
+        return '大于 1 小时';
+      case QueueLevel.reservationNeeded:
+        return '建议预约';
+      case null:
+        return '-';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -78,7 +93,11 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     final priceController = TextEditingController(
       text: current.priceLevel?.toString() ?? '',
     );
-    final noteController = TextEditingController(text: current.experienceNote ?? '');
+    final noteController = TextEditingController(
+      text: current.experienceNote ?? '',
+    );
+    QueueLevel selectedQueueLevel =
+        current.store.value?.queueLevel ?? QueueLevel.noQueue;
 
     final shouldSave = await showDialog<bool>(
       context: context,
@@ -86,28 +105,52 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
         return AlertDialog(
           title: const Text('编辑条目'),
           content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: storeController,
-                  decoration: const InputDecoration(labelText: 'Store Name'),
-                ),
-                TextField(
-                  controller: dishController,
-                  decoration: const InputDecoration(labelText: 'Dish Name'),
-                ),
-                TextField(
-                  controller: priceController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '价格 (Price Level)'),
-                ),
-                TextField(
-                  controller: noteController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: '用餐体验 (Note)'),
-                ),
-              ],
+            child: StatefulBuilder(
+              builder: (context, setDialogState) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: storeController,
+                      decoration: const InputDecoration(labelText: 'Store Name'),
+                    ),
+                    DropdownButtonFormField<QueueLevel>(
+                      value: selectedQueueLevel,
+                      decoration: const InputDecoration(labelText: '排队时长'),
+                      items: QueueLevel.values.map((QueueLevel level) {
+                        return DropdownMenuItem<QueueLevel>(
+                          value: level,
+                          child: Text(_formatQueueLevel(level)),
+                        );
+                      }).toList(),
+                      onChanged: (QueueLevel? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setDialogState(() {
+                          selectedQueueLevel = value;
+                        });
+                      },
+                    ),
+                    TextField(
+                      controller: dishController,
+                      decoration: const InputDecoration(labelText: 'Dish Name'),
+                    ),
+                    TextField(
+                      controller: priceController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '价格 (Price Level)',
+                      ),
+                    ),
+                    TextField(
+                      controller: noteController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: '用餐体验 (Note)'),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           actions: [
@@ -179,23 +222,26 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
         ..experienceNote = note.isEmpty ? null : note
         ..updatedAt = DateTime.now();
 
-      if (storeName.isNotEmpty) {
-        final existingStore = m.store.value;
-        if (existingStore == null) {
+      final existingStore = m.store.value;
+      if (existingStore == null) {
+        if (storeName.isNotEmpty) {
           final newStore = Store()
             ..storeName = storeName
-            ..queueLevel = QueueLevel.noQueue
+            ..queueLevel = selectedQueueLevel
             ..createdAt = DateTime.now()
             ..updatedAt = DateTime.now();
           await IsarService.isar.stores.put(newStore);
           m.store.value = newStore;
           await m.store.save();
-        } else {
-          existingStore
-            ..storeName = storeName
-            ..updatedAt = DateTime.now();
-          await IsarService.isar.stores.put(existingStore);
         }
+      } else {
+        existingStore
+          ..queueLevel = selectedQueueLevel
+          ..updatedAt = DateTime.now();
+        if (storeName.isNotEmpty) {
+          existingStore.storeName = storeName;
+        }
+        await IsarService.isar.stores.put(existingStore);
       }
 
       await IsarService.isar.dishMarks.put(m);
@@ -239,6 +285,8 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Store: ${mark!.store.value?.storeName ?? '(no store)'}"),
+                  const SizedBox(height: 10),
+                  Text("Queue: ${_formatQueueLevel(mark!.store.value?.queueLevel)}"),
                   const SizedBox(height: 10),
                   Text("Price Level: ${mark!.priceLevel ?? "-"}"),
                   const SizedBox(height: 10),

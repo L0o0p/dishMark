@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/page/dish_mark_detail.dart';
@@ -91,12 +93,14 @@ class _DraggableScrollableSheetExampleState
     }
   }
 
-  String _formatPriceLevel(double? priceLevel) {
-    if (priceLevel == null) {
+  String _formatPrice(double? price) {
+    if (price == null) {
       return '-';
     }
-    final int level = priceLevel.round().clamp(1, 5).toInt();
-    return '￥' * level;
+    if (price == price.roundToDouble()) {
+      return '￥${price.toStringAsFixed(0)}';
+    }
+    return '￥${price.toStringAsFixed(2)}';
   }
 
   String _formatDate(DateTime? date) {
@@ -106,7 +110,17 @@ class _DraggableScrollableSheetExampleState
     final String y = date.year.toString().padLeft(4, '0');
     final String m = date.month.toString().padLeft(2, '0');
     final String d = date.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
+    final String hh = date.hour.toString().padLeft(2, '0');
+    final String mm = date.minute.toString().padLeft(2, '0');
+    return '$y-$m-$d $hh:$mm';
+  }
+
+  String _formatNote(String? note) {
+    final String trimmed = (note ?? '').trim();
+    if (trimmed.isEmpty) {
+      return '-';
+    }
+    return trimmed;
   }
 
   String _buildShareText() {
@@ -197,23 +211,32 @@ class _DraggableScrollableSheetExampleState
     required BorderRadius borderRadius,
   }) {
     final String imagePath = (_dish?.imagePath ?? '').trim();
-    final bool isNetwork =
-        imagePath.startsWith('http://') || imagePath.startsWith('https://');
-    final bool isAsset = imagePath.startsWith('assets/');
+    final String localFilePath = imagePath.startsWith('file://')
+        ? Uri.parse(imagePath).toFilePath()
+        : imagePath;
     final Widget fallback = Image.asset('assets/logo.jpg', fit: BoxFit.cover);
-    final Widget image = isNetwork
-        ? Image.network(
-            imagePath,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => fallback,
-          )
-        : isAsset
-        ? Image.asset(
-            imagePath,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => fallback,
-          )
-        : fallback;
+    Widget image;
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      image = Image.network(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else if (imagePath.startsWith('assets/')) {
+      image = Image.asset(
+        imagePath,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else if (localFilePath.isNotEmpty) {
+      image = Image.file(
+        File(localFilePath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else {
+      image = fallback;
+    }
     return SizedBox(
       width: width,
       height: height,
@@ -347,7 +370,7 @@ class _DraggableScrollableSheetExampleState
         ),
         const SizedBox(height: 24),
         Text(
-          '价格等级：${_formatPriceLevel(mark.priceLevel)}',
+          '价格：${_formatPrice(mark.priceLevel)}',
           style: const TextStyle(fontSize: 18),
         ),
         const SizedBox(height: 12),
@@ -357,16 +380,19 @@ class _DraggableScrollableSheetExampleState
         ),
         const SizedBox(height: 12),
         Text(
-          '体验备注：${(mark.experienceNote ?? '').trim().isEmpty ? '-' : mark.experienceNote!.trim()}',
-          maxLines: 3,
-          overflow: TextOverflow.ellipsis,
+          '简评：${_formatNote(mark.experienceNote)}',
           style: const TextStyle(fontSize: 18),
         ),
         const SizedBox(height: 12),
         Text(
-          '上一次吃：${_formatDate(mark.lastTastedAt)}',
+          '上一次品尝：${_formatDate(mark.lastTastedAt)}',
           style: const TextStyle(fontSize: 18),
         ),
+        const SizedBox(height: 12),
+        // Text(
+        //   '图片路径：${mark.imagePath.trim().isEmpty ? '-' : mark.imagePath.trim()}',
+        //   style: const TextStyle(fontSize: 18),
+        // ),
         const SizedBox(height: 24),
         Row(
           children: <Widget>[
