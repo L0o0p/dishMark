@@ -12,6 +12,7 @@ dependencies:
   isar: ^3.1.0
   isar_flutter_libs: ^3.1.0
   path_provider: ^2.1.0
+  image_picker: ^1.1.2
   amap_flutter_map_plus: ^3.1.1
   amap_flutter_base_plus: ^3.1.0
   permission_handler: ^11.3.1
