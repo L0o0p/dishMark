@@ -17,6 +17,7 @@ dependencies:
   amap_flutter_base_plus: ^3.1.0
   permission_handler: ^11.3.1
   flutter_launcher_icons: ^0.14.4
+  share_plus: ^10.1.2
 
 dev_dependencies:
   flutter_test:
