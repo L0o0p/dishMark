@@ -5,8 +5,8 @@ import 'package:dishmark/data/store.dart';
 import 'package:dishmark/page/dish_mark_detail.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/widgets/share_card.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
 
 class DraggableScrollableSheetExample extends StatefulWidget {
@@ -123,31 +123,12 @@ class _DraggableScrollableSheetExampleState
     return trimmed;
   }
 
-  String _buildShareText() {
+  Future<void> _shareDish() async {
     final DishMark? mark = _dish;
     if (mark == null) {
-      return '';
-    }
-    final String storeName = _store?.storeName.trim().isNotEmpty == true
-        ? _store!.storeName
-        : '未知店铺';
-    final String tags = mark.flavors.take(4).map(_formatFlavor).join(' / ');
-    final String note = (mark.experienceNote ?? '').trim();
-    return '推荐菜：${mark.dishName}\n店铺：$storeName\n口味：${tags.isEmpty ? '-' : tags}\n备注：${note.isEmpty ? '-' : note}';
-  }
-
-  Future<void> _shareDish() async {
-    final String text = _buildShareText();
-    if (text.isEmpty) {
       return;
     }
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!mounted) {
-      return;
-    }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('分享文案已复制到剪贴板')));
+    await showDishShareSheet(context: context, dish: mark, store: _store);
   }
 
   Future<void> _editDish() async {
