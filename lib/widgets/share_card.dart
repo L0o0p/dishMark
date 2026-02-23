@@ -4,11 +4,12 @@ import 'dart:ui' as ui;
 
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
+import 'package:dishmark/service/wechat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:fluwx/fluwx.dart';
 
 Future<void> showDishShareSheet({
   required BuildContext context,
@@ -117,7 +118,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       if (renderObject.debugNeedsPaint) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
-      final ui.Image image = await renderObject.toImage(pixelRatio: 3.0);
+      final ui.Image image = await renderObject.toImage(pixelRatio: 2.0);
       final ByteData? byteData = await image.toByteData(
         format: ui.ImageByteFormat.png,
       );
@@ -140,7 +141,10 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     }
   }
 
-  Future<void> _shareCardImage({String? targetHint}) async {
+  Future<void> _shareCardImageToWeChat({
+    required WeChatScene scene,
+    required String targetHint,
+  }) async {
     if (_isSharingImage) {
       return;
     }
@@ -160,22 +164,36 @@ class _DishShareSheetState extends State<_DishShareSheet> {
         return;
       }
 
-      await Share.shareXFiles(
-        <XFile>[
-          XFile(
-            imageFile.path,
-            name: 'dishmark_${widget.dish.id}_${_currentTemplate + 1}.png',
-            mimeType: 'image/png',
-          ),
-        ],
-        subject: '推荐菜：${widget.dish.dishName}',
+      final bool wechatReady = await WeChatService.ensureInitialized();
+      if (!mounted) {
+        return;
+      }
+      if (!wechatReady) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('微信不可用，请检查 fluwx 配置或微信安装状态')),
+        );
+        return;
+      }
+
+      final Uint8List imageBytes = await imageFile.readAsBytes();
+      final bool launched = await WeChatService.client.share(
+        WeChatShareImageModel(
+          WeChatImageToShare(uint8List: imageBytes),
+          scene: scene,
+          title: widget.dish.dishName,
+          description: _buildShareText(),
+        ),
       );
       if (!mounted) {
         return;
       }
-      final String message = targetHint == null
-          ? '已打开系统分享面板（图片）'
-          : '已打开系统分享面板，请选择$targetHint（图片）';
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('拉起微信失败，请稍后重试')),
+        );
+        return;
+      }
+      final String message = '已拉起微信，请在$targetHint中完成发送';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -596,7 +614,10 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                         onPressed: _isSharingImage
                             ? null
                             : () {
-                                _shareCardImage(targetHint: '微信');
+                                _shareCardImageToWeChat(
+                                  scene: WeChatScene.session,
+                                  targetHint: '微信会话',
+                                );
                               },
                       ),
                       const SizedBox(width: 8),
@@ -606,7 +627,10 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                         onPressed: _isSharingImage
                             ? null
                             : () {
-                                _shareCardImage(targetHint: '朋友圈');
+                                _shareCardImageToWeChat(
+                                  scene: WeChatScene.timeline,
+                                  targetHint: '朋友圈',
+                                );
                               },
                       ),
                       const SizedBox(width: 8),
