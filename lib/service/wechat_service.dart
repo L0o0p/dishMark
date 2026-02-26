@@ -20,6 +20,20 @@ class WeChatService {
 
   static bool _initialized = false;
   static bool _isAvailable = false;
+  static bool _subscriberAttached = false;
+
+  static void _attachResponseLoggerOnce() {
+    if (_subscriberAttached) {
+      return;
+    }
+    _subscriberAttached = true;
+    client.addSubscriber((WeChatResponse response) {
+      debugPrint(
+        'WeChatService response: ${response.runtimeType}, '
+        'errCode=${response.errCode}, errStr=${response.errStr}',
+      );
+    });
+  }
 
   static Future<bool> ensureInitialized() async {
     if (_initialized) {
@@ -61,6 +75,9 @@ class WeChatService {
       );
       final bool installed = await client.isWeChatInstalled;
       _isAvailable = registered && installed;
+      if (_isAvailable) {
+        _attachResponseLoggerOnce();
+      }
       debugPrint(
         'WeChatService initialized: registered=$registered, installed=$installed',
       );

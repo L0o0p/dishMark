@@ -14,4 +14,29 @@ import AMapFoundationKit
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
+
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    let handled = super.application(app, open: url, options: options)
+    print("AppDelegate openURL: \(url.absoluteString), handled=\(handled)")
+    return handled
+  }
+
+  override func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    let handled = super.application(
+      application,
+      continue: userActivity,
+      restorationHandler: restorationHandler
+    )
+    let urlString = userActivity.webpageURL?.absoluteString ?? "(nil)"
+    print("AppDelegate continueUserActivity: \(userActivity.activityType), url=\(urlString), handled=\(handled)")
+    return handled
+  }
 }

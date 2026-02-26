@@ -118,7 +118,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       if (renderObject.debugNeedsPaint) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
-      final ui.Image image = await renderObject.toImage(pixelRatio: 2.0);
+      // A lower ratio keeps shared payload smaller and improves iOS WeChat handoff stability.
+      final ui.Image image = await renderObject.toImage(pixelRatio: 1.2);
       final ByteData? byteData = await image.toByteData(
         format: ui.ImageByteFormat.png,
       );
@@ -176,12 +177,11 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       }
 
       final Uint8List imageBytes = await imageFile.readAsBytes();
+      debugPrint('WeChat share image bytes=${imageBytes.length}');
       final bool launched = await WeChatService.client.share(
         WeChatShareImageModel(
           WeChatImageToShare(uint8List: imageBytes),
           scene: scene,
-          title: widget.dish.dishName,
-          description: _buildShareText(),
         ),
       );
       if (!mounted) {
@@ -499,9 +499,10 @@ class _DishShareSheetState extends State<_DishShareSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.sizeOf(context).height;
-    final double sheetHeight = (screenHeight * 0.82).clamp(520.0, 760.0).toDouble();
-    final double topAreaHeight = (screenHeight * 0.46).clamp(290.0, 430.0).toDouble();
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final double availableHeight =
+        mediaQuery.size.height - mediaQuery.viewPadding.top - mediaQuery.viewPadding.bottom;
+    final double sheetHeight = (availableHeight * 0.9).clamp(420.0, 760.0).toDouble();
 
     return Container(
       height: sheetHeight,
@@ -522,8 +523,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: topAreaHeight,
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
