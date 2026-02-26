@@ -11,11 +11,11 @@ class WeChatService {
   // They also need to match the `fluwx` section in pubspec.yaml.
   static const String _appId = String.fromEnvironment(
     'WECHAT_APP_ID',
-    defaultValue: '123456',
+    defaultValue: 'wxad43d21e6da50817',
   );
   static const String _universalLink = String.fromEnvironment(
     'WECHAT_UNIVERSAL_LINK',
-    defaultValue: 'https://testdomain.com',
+    defaultValue: 'https://dishmark.loopshen.top/',
   );
 
   static bool _initialized = false;
@@ -32,6 +32,25 @@ class WeChatService {
       _isAvailable = false;
       return _isAvailable;
     }
+    if (!_appId.startsWith('wx')) {
+      debugPrint(
+        'WeChatService: appId="$_appId" is not a valid WeChat app id. '
+        'Replace it in pubspec.yaml and/or --dart-define WECHAT_APP_ID.',
+      );
+      _isAvailable = false;
+      return _isAvailable;
+    }
+    if (!_universalLink.startsWith('https://')) {
+      debugPrint(
+        'WeChatService: universalLink="$_universalLink" is invalid. '
+        'It must start with https:// and match WeChat Open Platform settings.',
+      );
+      _isAvailable = false;
+      return _isAvailable;
+    }
+    debugPrint(
+      'WeChatService: initializing with appId=$_appId, universalLink=$_universalLink',
+    );
 
     try {
       final bool registered = await client.registerApi(

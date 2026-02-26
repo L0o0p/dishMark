@@ -7,15 +7,15 @@ environment:
   sdk: ">=3.8.0 <4.0.0"
 
 fluwx:
-  app_id: '123456'
+  app_id: 'wxad43d21e6da50817' # TODO: replace with your real WeChat app id (starts with wx).
   debug_logging: true # Logging in debug mode.
   android:
 #    interrupt_wx_request: true # Defaults to true.
 #    flutter_activity: 'MainActivity' # Defaults to app's launcher
   ios:
-    universal_link: https://testdomain.com
+    universal_link: https://dishmark.loopshen.top/
     no_pay: true # Set to true to disable payment.
-#    scene_delegate: true # Defaults to false.
+    scene_delegate: true # Set true when using FlutterSceneDelegate.
 #    ignore_security: true # Set to true to disable security seetings.
 
 dependencies:
