@@ -6,10 +6,17 @@ PODS:
     - Flutter
   - AMapFoundation (1.8.2)
   - Flutter (1.0.0)
+  - fluwx (0.0.1):
+    - Flutter
+    - fluwx/no_pay (= 0.0.1)
+  - fluwx/no_pay (0.0.1):
+    - Flutter
+    - OpenWeChatSDKNoPay (~> 2.0.5)
   - image_picker_ios (0.0.1):
     - Flutter
   - isar_flutter_libs (1.0.0):
     - Flutter
+  - OpenWeChatSDKNoPay (2.0.5)
   - permission_handler_apple (9.3.0):
     - Flutter
   - share_plus (0.0.1):
@@ -18,6 +25,7 @@ PODS:
 DEPENDENCIES:
   - amap_flutter_map_plus (from `.symlinks/plugins/amap_flutter_map_plus/ios`)
   - Flutter (from `Flutter`)
+  - fluwx (from `.symlinks/plugins/fluwx/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - isar_flutter_libs (from `.symlinks/plugins/isar_flutter_libs/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
@@ -27,12 +35,15 @@ SPEC REPOS:
   trunk:
     - AMap3DMap
     - AMapFoundation
+    - OpenWeChatSDKNoPay
 
 EXTERNAL SOURCES:
   amap_flutter_map_plus:
     :path: ".symlinks/plugins/amap_flutter_map_plus/ios"
   Flutter:
     :path: Flutter
+  fluwx:
+    :path: ".symlinks/plugins/fluwx/ios"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   isar_flutter_libs:
@@ -47,8 +58,10 @@ SPEC CHECKSUMS:
   amap_flutter_map_plus: 1df734b018cc8f3b4f7af6e611248fa61a268c6c
   AMapFoundation: 9885c48fc3a78fdfb84a0299a2293e56ea3c9fec
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  fluwx: fc07b03ebb407d68ae135a9f31967de03a5d11b2
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   isar_flutter_libs: 9fc2cfb928c539e1b76c481ba5d143d556d94920
+  OpenWeChatSDKNoPay: a391d2a7c0d4db1bdc870f885bd4cba99b64f243
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
 

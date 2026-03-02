@@ -1,13 +1,17 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
+import 'package:dishmark/service/wechat_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:fluwx/fluwx.dart';
 import 'package:share_plus/share_plus.dart';
 
 Future<void> showDishShareSheet({
@@ -103,6 +107,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
 
   Future<File?> _captureCurrentTemplateAsImage() async {
     try {
+      FocusManager.instance.primaryFocus?.unfocus();
       await WidgetsBinding.instance.endOfFrame;
       final RenderObject? renderObject = _cardBoundaryKeys[_currentTemplate]
           .currentContext
@@ -114,7 +119,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       if (renderObject.debugNeedsPaint) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
-      final ui.Image image = await renderObject.toImage(pixelRatio: 3.0);
+      // A lower ratio keeps shared payload smaller and improves iOS WeChat handoff stability.
+      final ui.Image image = await renderObject.toImage(pixelRatio: 1.2);
       final ByteData? byteData = await image.toByteData(
         format: ui.ImageByteFormat.png,
       );
@@ -137,7 +143,59 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     }
   }
 
-  Future<void> _shareCardImage({String? targetHint}) async {
+  Future<Uint8List> _shrinkImageBytesForWeChat(Uint8List sourceBytes) async {
+    const int maxBytes = 240 * 1024;
+    if (sourceBytes.lengthInBytes <= maxBytes) {
+      return sourceBytes;
+    }
+
+    Uint8List currentBytes = sourceBytes;
+    for (int i = 0; i < 5 && currentBytes.lengthInBytes > maxBytes; i++) {
+      final ui.Codec probeCodec = await ui.instantiateImageCodec(currentBytes);
+      final ui.FrameInfo probeFrame = await probeCodec.getNextFrame();
+      final int sourceWidth = probeFrame.image.width;
+      final int sourceHeight = probeFrame.image.height;
+      probeFrame.image.dispose();
+      probeCodec.dispose();
+
+      final double ratio = (maxBytes / currentBytes.lengthInBytes).clamp(
+        0.2,
+        0.95,
+      );
+      final double scale = math.sqrt(ratio) * 0.92;
+      final int targetWidth = math.max(
+        120,
+        (sourceWidth * scale).round(),
+      );
+      final int targetHeight = math.max(
+        120,
+        (sourceHeight * scale).round(),
+      );
+
+      final ui.Codec resizeCodec = await ui.instantiateImageCodec(
+        currentBytes,
+        targetWidth: targetWidth,
+        targetHeight: targetHeight,
+      );
+      final ui.FrameInfo resizeFrame = await resizeCodec.getNextFrame();
+      final ByteData? resizeData = await resizeFrame.image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      resizeFrame.image.dispose();
+      resizeCodec.dispose();
+      if (resizeData == null) {
+        break;
+      }
+      currentBytes = resizeData.buffer.asUint8List();
+    }
+
+    return currentBytes;
+  }
+
+  Future<void> _shareCardImageToWeChat({
+    required WeChatScene scene,
+    required String targetHint,
+  }) async {
     if (_isSharingImage) {
       return;
     }
@@ -157,22 +215,43 @@ class _DishShareSheetState extends State<_DishShareSheet> {
         return;
       }
 
-      await Share.shareXFiles(<XFile>[
-        XFile(
-          imageFile.path,
-          name: 'dishmark_${widget.dish.id}_${_currentTemplate + 1}.png',
-          mimeType: 'image/png',
-        ),
-      ], subject: '推荐菜：${widget.dish.dishName}');
+      final bool wechatReady = await WeChatService.ensureInitialized();
       if (!mounted) {
         return;
       }
-      final String message = targetHint == null
-          ? '已打开系统分享面板（图片）'
-          : '已打开系统分享面板，请选择$targetHint（图片）';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      if (!wechatReady) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('微信不可用，请检查 fluwx 配置或微信安装状态')),
+        );
+        return;
+      }
+
+      final Uint8List imageBytes = await imageFile.readAsBytes();
+      final Uint8List optimizedBytes = await _shrinkImageBytesForWeChat(
+        imageBytes,
+      );
+      debugPrint(
+        'WeChat share image bytes original=${imageBytes.length}, optimized=${optimizedBytes.length}',
+      );
+      final bool launched = await WeChatService.client.share(
+        WeChatShareImageModel(
+          WeChatImageToShare(uint8List: optimizedBytes),
+          scene: scene,
+        ),
+      );
+      if (!mounted) {
+        return;
+      }
+      if (!launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('拉起微信失败，请稍后重试')),
+        );
+        return;
+      }
+      final String message = '已拉起微信，请在$targetHint中完成发送';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -198,6 +277,61 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('分享文案已复制到剪贴板')));
+  }
+
+  Rect? _getSharePositionOrigin() {
+    final RenderObject? renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+    }
+    return null;
+  }
+
+  Future<void> _shareViaSystemSheet() async {
+    if (_isSharingImage) {
+      return;
+    }
+    setState(() {
+      _isSharingImage = true;
+    });
+
+    try {
+      final File? imageFile = await _captureCurrentTemplateAsImage();
+      if (!mounted) {
+        return;
+      }
+      if (imageFile == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('分享图片生成失败，请重试')));
+        return;
+      }
+
+      await Share.shareXFiles(
+        <XFile>[
+          XFile(
+            imageFile.path,
+            name: 'dishmark_${widget.dish.id}_${_currentTemplate + 1}.png',
+            mimeType: 'image/png',
+          ),
+        ],
+        sharePositionOrigin: _getSharePositionOrigin(),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('系统分享拉起失败，请稍后重试')));
+      debugPrint('system share failed: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSharingImage = false;
+        });
+      }
+    }
   }
 
   @override
@@ -303,8 +437,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _buildDishImage(height: 210),
-              const SizedBox(height: 14),
+              Expanded(child: _buildDishImage()),
+              const SizedBox(height: 12),
               Text(
                 widget.dish.dishName,
                 maxLines: 2,
@@ -326,8 +460,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 10),
-              _buildFlavorPills(maxCount: 3),
+              const SizedBox(height: 8),
+              _buildFlavorPills(maxCount: 2),
             ],
           ),
         ),
@@ -347,6 +481,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
@@ -357,69 +492,69 @@ class _DishShareSheetState extends State<_DishShareSheet> {
               ),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          widget.dish.dishName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            height: 1.1,
-                            fontWeight: FontWeight.w800,
-                            color: SoftPalette.textPrimary,
-                          ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        widget.dish.dishName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          color: SoftPalette.textPrimary,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          storeName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: SoftPalette.textSecondary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        storeName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SoftPalette.textSecondary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const Spacer(),
-                        Text(
-                          '人均：${_formatPrice(widget.dish.priceLevel)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: SoftPalette.textPrimary,
-                          ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        '人均：${_formatPrice(widget.dish.priceLevel)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: SoftPalette.textPrimary,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '简评：${_formatNote(widget.dish.experienceNote)}',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: SoftPalette.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '简评：${_formatNote(widget.dish.experienceNote)}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SoftPalette.textSecondary,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildFlavorPills(maxCount: 2),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 120,
-                    child: _buildDishImage(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 132,
+                  height: 132,
+                  child: _buildDishImage(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            _buildFlavorPills(maxCount: 2),
           ],
         ),
       ),
@@ -431,32 +566,27 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     required String label,
     required VoidCallback? onPressed,
   }) {
-    return Expanded(
-      child: FilledButton.tonalIcon(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          backgroundColor: SoftPalette.surfaceElevated,
-          foregroundColor: SoftPalette.textPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        backgroundColor: SoftPalette.surfaceElevated,
+        foregroundColor: SoftPalette.textPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        icon: Icon(icon),
-        label: Text(label),
       ),
+      icon: Icon(icon),
+      label: Text(label),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final double screenHeight = MediaQuery.sizeOf(context).height;
-    final double sheetHeight = (screenHeight * 0.82)
-        .clamp(520.0, 760.0)
-        .toDouble();
-    final double topAreaHeight = (screenHeight * 0.46)
-        .clamp(290.0, 430.0)
-        .toDouble();
+    final MediaQueryData mediaQuery = MediaQuery.of(context);
+    final double availableHeight =
+        mediaQuery.size.height - mediaQuery.viewPadding.top - mediaQuery.viewPadding.bottom;
+    final double sheetHeight = (availableHeight * 0.9).clamp(420.0, 760.0).toDouble();
 
     return Container(
       height: sheetHeight,
@@ -477,8 +607,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: topAreaHeight,
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -492,7 +621,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '左右滑动，挑一张最像此刻心情的卡片',
+                    '左右滑动，挑一张最符合口味的卡片',
                     style: TextStyle(
                       fontSize: 13,
                       color: SoftPalette.textSecondary,
@@ -551,7 +680,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   const Text(
-                    '系统分享渠道',
+                    '分享到',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -559,34 +688,64 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      _buildShareAction(
-                        icon: Icons.chat_bubble_outline,
-                        label: '微信',
-                        onPressed: _isSharingImage
-                            ? null
-                            : () {
-                                _shareCardImage(targetHint: '微信');
-                              },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildShareAction(
-                        icon: Icons.groups_outlined,
-                        label: '朋友圈',
-                        onPressed: _isSharingImage
-                            ? null
-                            : () {
-                                _shareCardImage(targetHint: '朋友圈');
-                              },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildShareAction(
-                        icon: Icons.copy_all_outlined,
-                        label: 'Copy',
-                        onPressed: _copyShareText,
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (BuildContext context, BoxConstraints constraints) {
+                      const double spacing = 8;
+                      final double itemWidth =
+                          (constraints.maxWidth - spacing) / 2;
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: <Widget>[
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.chat_bubble_outline,
+                              label: '微信',
+                              onPressed: _isSharingImage
+                                  ? null
+                                  : () {
+                                      _shareCardImageToWeChat(
+                                        scene: WeChatScene.session,
+                                        targetHint: '微信会话',
+                                      );
+                                    },
+                            ),
+                          ),
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.groups_outlined,
+                              label: '朋友圈',
+                              onPressed: _isSharingImage
+                                  ? null
+                                  : () {
+                                      _shareCardImageToWeChat(
+                                        scene: WeChatScene.timeline,
+                                        targetHint: '朋友圈',
+                                      );
+                                    },
+                            ),
+                          ),
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.copy_all_outlined,
+                              label: 'Copy',
+                              onPressed: _copyShareText,
+                            ),
+                          ),
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.ios_share_outlined,
+                              label: '其他',
+                              onPressed: _shareViaSystemSheet,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),

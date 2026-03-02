@@ -1,5 +1,7 @@
 import 'package:dishmark/page/dish_map.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/service/wechat_service.dart';
+import 'package:dishmark/data/store.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await IsarService.init();
+  await WeChatService.ensureInitialized();
 
   // 临时测试代码：写入测试数据
   // await _insertTestData();
