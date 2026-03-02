@@ -39,6 +39,9 @@ class _DishShareSheet extends StatefulWidget {
 }
 
 class _DishShareSheetState extends State<_DishShareSheet> {
+  static const int _wechatSessionIndex = 0;
+  static const int _wechatTimelineIndex = 1;
+
   static const List<List<Color>> _templateGradients = <List<Color>>[
     <Color>[Color(0xFFFFF7EC), Color(0xFFFBE5CF)],
     <Color>[Color(0xFFFFF3E8), Color(0xFFF3E4D5)],
@@ -49,8 +52,29 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     _templateGradients.length,
     (_) => GlobalKey(),
   );
+  static const Duration _systemShareDebounce = Duration(milliseconds: 800);
   int _currentTemplate = 0;
-  bool _isSharingImage = false;
+  int? _activeWeChatChannel;
+  DateTime? _lastSystemShareAt;
+
+  bool _beginWeChatShare(int channel) {
+    if (_activeWeChatChannel != null) {
+      return false;
+    }
+    setState(() {
+      _activeWeChatChannel = channel;
+    });
+    return true;
+  }
+
+  void _endWeChatShare() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _activeWeChatChannel = null;
+    });
+  }
 
   String _formatFlavor(Flavor flavor) {
     switch (flavor) {
@@ -196,12 +220,12 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     required WeChatScene scene,
     required String targetHint,
   }) async {
-    if (_isSharingImage) {
+    final int channel = scene == WeChatScene.session
+        ? _wechatSessionIndex
+        : _wechatTimelineIndex;
+    if (!_beginWeChatShare(channel)) {
       return;
     }
-    setState(() {
-      _isSharingImage = true;
-    });
 
     try {
       final File? imageFile = await _captureCurrentTemplateAsImage();
@@ -261,11 +285,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       ).showSnackBar(const SnackBar(content: Text('分享失败，请稍后重试')));
       debugPrint('share image failed: $error');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSharingImage = false;
-        });
-      }
+      _endWeChatShare();
     }
   }
 
@@ -288,12 +308,13 @@ class _DishShareSheetState extends State<_DishShareSheet> {
   }
 
   Future<void> _shareViaSystemSheet() async {
-    if (_isSharingImage) {
+    final DateTime now = DateTime.now();
+    final DateTime? lastShareAt = _lastSystemShareAt;
+    if (lastShareAt != null &&
+        now.difference(lastShareAt) < _systemShareDebounce) {
       return;
     }
-    setState(() {
-      _isSharingImage = true;
-    });
+    _lastSystemShareAt = now;
 
     try {
       final File? imageFile = await _captureCurrentTemplateAsImage();
@@ -325,12 +346,6 @@ class _DishShareSheetState extends State<_DishShareSheet> {
         context,
       ).showSnackBar(const SnackBar(content: Text('系统分享拉起失败，请稍后重试')));
       debugPrint('system share failed: $error');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSharingImage = false;
-        });
-      }
     }
   }
 
@@ -702,7 +717,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                             child: _buildShareAction(
                               icon: Icons.chat_bubble_outline,
                               label: '微信',
-                              onPressed: _isSharingImage
+                              onPressed:
+                                  _activeWeChatChannel == _wechatSessionIndex
                                   ? null
                                   : () {
                                       _shareCardImageToWeChat(
@@ -717,7 +733,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                             child: _buildShareAction(
                               icon: Icons.groups_outlined,
                               label: '朋友圈',
-                              onPressed: _isSharingImage
+                              onPressed:
+                                  _activeWeChatChannel == _wechatTimelineIndex
                                   ? null
                                   : () {
                                       _shareCardImageToWeChat(
