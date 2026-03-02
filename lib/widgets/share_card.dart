@@ -12,6 +12,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:fluwx/fluwx.dart';
+import 'package:share_plus/share_plus.dart';
 
 Future<void> showDishShareSheet({
   required BuildContext context,
@@ -278,6 +279,57 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     ).showSnackBar(const SnackBar(content: Text('分享文案已复制到剪贴板')));
   }
 
+  Rect? _getSharePositionOrigin() {
+    final RenderObject? renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+    }
+    return null;
+  }
+
+  Future<void> _shareViaSystemSheet() async {
+    if (_isSharingImage) {
+      return;
+    }
+    setState(() {
+      _isSharingImage = true;
+    });
+
+    try {
+      final File? imageFile = await _captureCurrentTemplateAsImage();
+      if (!mounted) {
+        return;
+      }
+      if (imageFile == null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('分享图片生成失败，请重试')));
+        return;
+      }
+
+      await Share.shareXFiles(
+        <XFile>[XFile(imageFile.path)],
+        text: _buildShareText(),
+        subject: 'DishMark 分享：${widget.dish.dishName}',
+        sharePositionOrigin: _getSharePositionOrigin(),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('系统分享拉起失败，请稍后重试')));
+      debugPrint('system share failed: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSharingImage = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -510,20 +562,18 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     required String label,
     required VoidCallback? onPressed,
   }) {
-    return Expanded(
-      child: FilledButton.tonalIcon(
-        onPressed: onPressed,
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          backgroundColor: SoftPalette.surfaceElevated,
-          foregroundColor: SoftPalette.textPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        backgroundColor: SoftPalette.surfaceElevated,
+        foregroundColor: SoftPalette.textPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
         ),
-        icon: Icon(icon),
-        label: Text(label),
       ),
+      icon: Icon(icon),
+      label: Text(label),
     );
   }
 
@@ -567,7 +617,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '左右滑动，挑一张最像此刻心情的卡片',
+                    '左右滑动，挑一张最符合口味的卡片',
                     style: TextStyle(
                       fontSize: 13,
                       color: SoftPalette.textSecondary,
@@ -626,7 +676,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   const Text(
-                    '系统分享渠道',
+                    '分享到',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -634,40 +684,64 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      _buildShareAction(
-                        icon: Icons.chat_bubble_outline,
-                        label: '微信',
-                        onPressed: _isSharingImage
-                            ? null
-                            : () {
-                                _shareCardImageToWeChat(
-                                  scene: WeChatScene.session,
-                                  targetHint: '微信会话',
-                                );
-                              },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildShareAction(
-                        icon: Icons.groups_outlined,
-                        label: '朋友圈',
-                        onPressed: _isSharingImage
-                            ? null
-                            : () {
-                                _shareCardImageToWeChat(
-                                  scene: WeChatScene.timeline,
-                                  targetHint: '朋友圈',
-                                );
-                              },
-                      ),
-                      const SizedBox(width: 8),
-                      _buildShareAction(
-                        icon: Icons.copy_all_outlined,
-                        label: 'Copy',
-                        onPressed: _copyShareText,
-                      ),
-                    ],
+                  LayoutBuilder(
+                    builder: (BuildContext context, BoxConstraints constraints) {
+                      const double spacing = 8;
+                      final double itemWidth =
+                          (constraints.maxWidth - spacing) / 2;
+                      return Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: <Widget>[
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.chat_bubble_outline,
+                              label: '微信',
+                              onPressed: _isSharingImage
+                                  ? null
+                                  : () {
+                                      _shareCardImageToWeChat(
+                                        scene: WeChatScene.session,
+                                        targetHint: '微信会话',
+                                      );
+                                    },
+                            ),
+                          ),
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.groups_outlined,
+                              label: '朋友圈',
+                              onPressed: _isSharingImage
+                                  ? null
+                                  : () {
+                                      _shareCardImageToWeChat(
+                                        scene: WeChatScene.timeline,
+                                        targetHint: '朋友圈',
+                                      );
+                                    },
+                            ),
+                          ),
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.copy_all_outlined,
+                              label: 'Copy',
+                              onPressed: _copyShareText,
+                            ),
+                          ),
+                          SizedBox(
+                            width: itemWidth,
+                            child: _buildShareAction(
+                              icon: Icons.ios_share_outlined,
+                              label: '其他',
+                              onPressed: _shareViaSystemSheet,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
