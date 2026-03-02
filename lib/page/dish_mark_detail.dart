@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:isar/isar.dart';
+import 'package:path_provider/path_provider.dart';
 
 class DishMarkDetail extends StatefulWidget {
   final Id markId;
@@ -16,7 +20,75 @@ class DishMarkDetail extends StatefulWidget {
 }
 
 class _DishMarkDetailState extends State<DishMarkDetail> {
+  final ImagePicker _imagePicker = ImagePicker();
   DishMark? mark;
+
+  Future<String?> _pickImageAndSaveToSandbox() async {
+    final XFile? pickedFile = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+    );
+    if (pickedFile == null) {
+      return null;
+    }
+
+    final Directory appDocDir = await getApplicationDocumentsDirectory();
+    final Directory imageDir = Directory('${appDocDir.path}/dish_images');
+    if (!await imageDir.exists()) {
+      await imageDir.create(recursive: true);
+    }
+
+    final String originalName = pickedFile.name;
+    final int dotIndex = originalName.lastIndexOf('.');
+    final String extension = dotIndex >= 0
+        ? originalName.substring(dotIndex).toLowerCase()
+        : '.jpg';
+    final int timestamp = DateTime.now().millisecondsSinceEpoch;
+    final String targetPath = '${imageDir.path}/dish_$timestamp$extension';
+    await pickedFile.saveTo(targetPath);
+    return targetPath;
+  }
+
+  Widget _buildImagePreview(String imagePath) {
+    final String path = imagePath.trim();
+    final String localFilePath = path.startsWith('file://')
+        ? Uri.parse(path).toFilePath()
+        : path;
+    final Widget fallback = Container(
+      height: 150,
+      width: double.infinity,
+      alignment: Alignment.center,
+      color: SoftPalette.surfaceElevated,
+      child: const Text('图片加载失败'),
+    );
+
+    Widget image;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      image = Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else if (path.startsWith('assets/')) {
+      image = Image.asset(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else if (localFilePath.isNotEmpty) {
+      image = Image.file(
+        File(localFilePath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => fallback,
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(height: 150, width: double.infinity, child: image),
+    );
+  }
 
   String _formatQueueLevel(QueueLevel? level) {
     switch (level) {
@@ -130,6 +202,8 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     final noteController = TextEditingController(
       text: current.experienceNote ?? '',
     );
+    String editedImagePath = current.imagePath;
+    bool isPickingImage = false;
     QueueLevel selectedQueueLevel =
         current.store.value?.queueLevel ?? QueueLevel.noQueue;
 
@@ -170,6 +244,61 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                       controller: dishController,
                       decoration: const InputDecoration(labelText: '菜名'),
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            editedImagePath.trim().isEmpty
+                                ? '还没有选择图片'
+                                : '已选择一张图片',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                        FilledButton.tonalIcon(
+                          onPressed: isPickingImage
+                              ? null
+                              : () async {
+                                  setDialogState(() {
+                                    isPickingImage = true;
+                                  });
+                                  try {
+                                    final String? pickedPath =
+                                        await _pickImageAndSaveToSandbox();
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+                                    if (pickedPath != null) {
+                                      setDialogState(() {
+                                        editedImagePath = pickedPath;
+                                      });
+                                    }
+                                  } catch (error) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('选择图片失败: $error'),
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (context.mounted) {
+                                      setDialogState(() {
+                                        isPickingImage = false;
+                                      });
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: Text(isPickingImage ? '选择中' : '换图'),
+                        ),
+                      ],
+                    ),
+                    if (editedImagePath.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 10),
+                      _buildImagePreview(editedImagePath),
+                    ],
+                    const SizedBox(height: 12),
                     TextField(
                       controller: priceController,
                       keyboardType: const TextInputType.numberWithOptions(
@@ -259,6 +388,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
 
       m
         ..dishName = dishName
+        ..imagePath = editedImagePath.trim()
         ..priceLevel = priceValue
         ..experienceNote = note.isEmpty ? null : note
         ..updatedAt = DateTime.now();
