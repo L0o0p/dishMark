@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -104,6 +105,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
 
   Future<File?> _captureCurrentTemplateAsImage() async {
     try {
+      FocusManager.instance.primaryFocus?.unfocus();
       await WidgetsBinding.instance.endOfFrame;
       final GlobalKey boundaryKey = _cardBoundaryKeys[_currentTemplate];
       final BuildContext? boundaryContext = boundaryKey.currentContext;
@@ -142,6 +144,55 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     }
   }
 
+  Future<Uint8List> _shrinkImageBytesForWeChat(Uint8List sourceBytes) async {
+    const int maxBytes = 240 * 1024;
+    if (sourceBytes.lengthInBytes <= maxBytes) {
+      return sourceBytes;
+    }
+
+    Uint8List currentBytes = sourceBytes;
+    for (int i = 0; i < 5 && currentBytes.lengthInBytes > maxBytes; i++) {
+      final ui.Codec probeCodec = await ui.instantiateImageCodec(currentBytes);
+      final ui.FrameInfo probeFrame = await probeCodec.getNextFrame();
+      final int sourceWidth = probeFrame.image.width;
+      final int sourceHeight = probeFrame.image.height;
+      probeFrame.image.dispose();
+      probeCodec.dispose();
+
+      final double ratio = (maxBytes / currentBytes.lengthInBytes).clamp(
+        0.2,
+        0.95,
+      );
+      final double scale = math.sqrt(ratio) * 0.92;
+      final int targetWidth = math.max(
+        120,
+        (sourceWidth * scale).round(),
+      );
+      final int targetHeight = math.max(
+        120,
+        (sourceHeight * scale).round(),
+      );
+
+      final ui.Codec resizeCodec = await ui.instantiateImageCodec(
+        currentBytes,
+        targetWidth: targetWidth,
+        targetHeight: targetHeight,
+      );
+      final ui.FrameInfo resizeFrame = await resizeCodec.getNextFrame();
+      final ByteData? resizeData = await resizeFrame.image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+      resizeFrame.image.dispose();
+      resizeCodec.dispose();
+      if (resizeData == null) {
+        break;
+      }
+      currentBytes = resizeData.buffer.asUint8List();
+    }
+
+    return currentBytes;
+  }
+
   Future<void> _shareCardImageToWeChat({
     required WeChatScene scene,
     required String targetHint,
@@ -177,10 +228,15 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       }
 
       final Uint8List imageBytes = await imageFile.readAsBytes();
-      debugPrint('WeChat share image bytes=${imageBytes.length}');
+      final Uint8List optimizedBytes = await _shrinkImageBytesForWeChat(
+        imageBytes,
+      );
+      debugPrint(
+        'WeChat share image bytes original=${imageBytes.length}, optimized=${optimizedBytes.length}',
+      );
       final bool launched = await WeChatService.client.share(
         WeChatShareImageModel(
-          WeChatImageToShare(uint8List: imageBytes),
+          WeChatImageToShare(uint8List: optimizedBytes),
           scene: scene,
         ),
       );

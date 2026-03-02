@@ -15,7 +15,7 @@ fluwx:
   ios:
     universal_link: https://dishmark.loopshen.top/
     no_pay: true # Set to true to disable payment.
-    scene_delegate: true # Set true when using FlutterSceneDelegate.
+    scene_delegate: false # Use AppDelegate callback path for WeChat universal link.
 #    ignore_security: true # Set to true to disable security seetings.
 
 dependencies:
