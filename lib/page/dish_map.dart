@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
@@ -91,13 +92,15 @@ class _DishMapState extends State<DishMap> {
   ];
 
   final Map<int, Marker> _dishMarkerMap = <int, Marker>{};
+  final Map<int, String> _dishMarkerImagePathMap = <int, String>{};
   final Set<int> _pendingDeletedDishIds = <int>{};
   AMapController? _mapController;
   Set<Polyline> polylines = {};
   Set<Polygon> polygons = {};
-  BitmapDescriptor _dishMarkerIcon = BitmapDescriptor.defaultMarker;
-  final Map<int, BitmapDescriptor> _dishMarkerIconCache =
-      <int, BitmapDescriptor>{};
+  final Map<Object, BitmapDescriptor> _dishMarkerIconCache =
+      <Object, BitmapDescriptor>{};
+  final Map<Object, Uint8List> _dishMarkerImageBytesCache =
+      <Object, Uint8List>{};
   String? _lastPoiName;
   LatLng? _lastTapLatLng;
   LatLng? _myLatLng;
@@ -148,35 +151,85 @@ class _DishMapState extends State<DishMap> {
 
   Future<void> _initDishMarkerIcon() async {
     try {
-      _dishMarkerIcon = await _getDishMarkerIconByScale(1.0);
+      await _getDishMarkerIconByScale(1.0);
     } catch (e) {
       debugPrint('Failed to build memory marker icon: $e');
-      _dishMarkerIcon = BitmapDescriptor.defaultMarker;
     }
     await loadDishMarkers();
   }
 
-  Future<BitmapDescriptor> _getDishMarkerIconByScale(double scale) async {
+  Future<BitmapDescriptor> _getDishMarkerIconByScale(
+    double scale, {
+    String? imagePath,
+  }) async {
     final int targetSizePx = ((_dishIconSizePx * scale).round()).clamp(1, 1024);
-    final BitmapDescriptor? cachedIcon = _dishMarkerIconCache[targetSizePx];
+    final String sourcePath =
+        imagePath?.trim().isNotEmpty == true
+        ? imagePath!.trim()
+        : _dishIconAssetPath;
+    final String iconCacheKey = '$sourcePath@$targetSizePx';
+    final BitmapDescriptor? cachedIcon = _dishMarkerIconCache[iconCacheKey];
     if (cachedIcon != null) {
       return cachedIcon;
     }
 
+    final Uint8List rawBytes = await _loadDishMarkerRawBytes(sourcePath);
     final BitmapDescriptor icon = await _buildMemoryMarkerIcon(
-      assetPath: _dishIconAssetPath,
+      rawBytes: rawBytes,
       targetSizePx: targetSizePx,
     );
-    _dishMarkerIconCache[targetSizePx] = icon;
+    _dishMarkerIconCache[iconCacheKey] = icon;
     return icon;
   }
 
+  Future<Uint8List> _loadDishMarkerRawBytes(String sourcePath) async {
+    final Uint8List? cachedBytes = _dishMarkerImageBytesCache[sourcePath];
+    if (cachedBytes != null) {
+      return cachedBytes;
+    }
+
+    try {
+      Uint8List rawBytes;
+      if (sourcePath.startsWith('http://') ||
+          sourcePath.startsWith('https://')) {
+        final ByteData data = await NetworkAssetBundle(
+          Uri.parse(sourcePath),
+        ).load(sourcePath);
+        rawBytes = data.buffer.asUint8List();
+      } else if (sourcePath.startsWith('assets/')) {
+        final ByteData data = await rootBundle.load(sourcePath);
+        rawBytes = data.buffer.asUint8List();
+      } else {
+        final String filePath = sourcePath.startsWith('file://')
+            ? Uri.parse(sourcePath).toFilePath()
+            : sourcePath;
+        final File file = File(filePath);
+        if (!await file.exists()) {
+          throw StateError('File does not exist: $filePath');
+        }
+        rawBytes = await file.readAsBytes();
+      }
+      _dishMarkerImageBytesCache[sourcePath] = rawBytes;
+      return rawBytes;
+    } catch (e) {
+      if (sourcePath != _dishIconAssetPath) {
+        debugPrint(
+          'Failed to load marker image "$sourcePath", fallback to logo: $e',
+        );
+        final Uint8List fallbackBytes = await _loadDishMarkerRawBytes(
+          _dishIconAssetPath,
+        );
+        _dishMarkerImageBytesCache[sourcePath] = fallbackBytes;
+        return fallbackBytes;
+      }
+      rethrow;
+    }
+  }
+
   Future<BitmapDescriptor> _buildMemoryMarkerIcon({
-    required String assetPath,
+    required Uint8List rawBytes,
     required int targetSizePx,
   }) async {
-    final ByteData byteData = await rootBundle.load(assetPath);
-    final Uint8List rawBytes = byteData.buffer.asUint8List();
     final int photoSize = (targetSizePx * 0.66).round().clamp(1, 1024);
 
     final ui.Codec codec = await ui.instantiateImageCodec(
@@ -270,6 +323,7 @@ class _DishMapState extends State<DishMap> {
   Future<void> loadDishMarkers() async {
     final dishMarks = await IsarService.isar.dishMarks.where().findAll();
     final Map<int, Marker> nextMarkers = <int, Marker>{};
+    final Map<int, String> nextMarkerImagePathMap = <int, String>{};
     int skippedWithoutLocation = 0;
 
     for (final dish in dishMarks) {
@@ -280,14 +334,20 @@ class _DishMapState extends State<DishMap> {
         continue;
       }
 
+      final String imagePath = dish.imagePath.trim();
+      final BitmapDescriptor icon = await _getDishMarkerIconByScale(
+        1.0,
+        imagePath: imagePath,
+      );
       final marker = _buildDishMarker(
         dish: dish,
         latitude: store.latitude!,
         longitude: store.longitude!,
         storeName: store.storeName,
-        icon: _dishMarkerIcon,
+        icon: icon,
       );
       nextMarkers[dish.id] = marker;
+      nextMarkerImagePathMap[dish.id] = imagePath;
     }
 
     if (!mounted) {
@@ -298,6 +358,9 @@ class _DishMapState extends State<DishMap> {
       _dishMarkerMap
         ..clear()
         ..addAll(nextMarkers);
+      _dishMarkerImagePathMap
+        ..clear()
+        ..addAll(nextMarkerImagePathMap);
     });
     debugPrint(
       'Dish markers loaded: ${_dishMarkerMap.length}, '
@@ -319,10 +382,14 @@ class _DishMapState extends State<DishMap> {
     if (store == null || store.latitude == null || store.longitude == null) {
       return;
     }
+    final String imagePath = dish.imagePath.trim();
 
     for (int i = 0; i < _appearScales.length; i++) {
       final double scale = _appearScales[i];
-      final BitmapDescriptor icon = await _getDishMarkerIconByScale(scale);
+      final BitmapDescriptor icon = await _getDishMarkerIconByScale(
+        scale,
+        imagePath: imagePath,
+      );
 
       final marker = _buildDishMarker(
         dish: dish,
@@ -337,6 +404,7 @@ class _DishMapState extends State<DishMap> {
       }
       setState(() {
         _dishMarkerMap[dish.id] = marker;
+        _dishMarkerImagePathMap[dish.id] = imagePath;
       });
 
       await Future<void>.delayed(
@@ -476,8 +544,10 @@ class _DishMapState extends State<DishMap> {
     final Marker? marker = _dishMarkerMap[id];
     if (marker == null) {
       debugPrint('Dish marker not found for dish id: $id');
+      _dishMarkerImagePathMap.remove(id);
       return;
     }
+    final String imagePath = _dishMarkerImagePathMap[id] ?? '';
 
     for (int i = 0; i < _disappearScales.length; i++) {
       if (!mounted || !_dishMarkerMap.containsKey(id)) {
@@ -485,6 +555,7 @@ class _DishMapState extends State<DishMap> {
       }
       final BitmapDescriptor icon = await _getDishMarkerIconByScale(
         _disappearScales[i],
+        imagePath: imagePath,
       );
       if (!mounted || !_dishMarkerMap.containsKey(id)) {
         return;
@@ -502,6 +573,7 @@ class _DishMapState extends State<DishMap> {
     }
     setState(() {
       _dishMarkerMap.remove(id);
+      _dishMarkerImagePathMap.remove(id);
     });
   }
 
