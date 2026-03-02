@@ -200,7 +200,7 @@ class _DraggableScrollableSheetExampleState
     final String localFilePath = imagePath.startsWith('file://')
         ? Uri.parse(imagePath).toFilePath()
         : imagePath;
-    final Widget fallback = Image.asset('assets/logo.jpg', fit: BoxFit.cover);
+    final Widget fallback = Image.asset('assets/logo.png', fit: BoxFit.cover);
     Widget image;
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
       image = Image.network(

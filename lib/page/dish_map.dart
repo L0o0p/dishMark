@@ -25,7 +25,7 @@ class DishMap extends StatefulWidget {
 }
 
 class _DishMapState extends State<DishMap> {
-  static const String _dishIconAssetPath = 'assets/logo.jpg';
+  static const String _dishIconAssetPath = 'assets/logo.png';
   static const int _dishIconSizePx = 72;
   static const bool _showPoiDebugPanel = false;
   static const List<double> _appearScales = <double>[

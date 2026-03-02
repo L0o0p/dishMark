@@ -72,7 +72,7 @@ class _DishMarkListState extends State<DishMarkList> {
     final String localFilePath = path.startsWith('file://')
         ? Uri.parse(path).toFilePath()
         : path;
-    final Widget fallback = Image.asset('assets/logo.jpg', fit: BoxFit.cover);
+    final Widget fallback = Image.asset('assets/logo.png', fit: BoxFit.cover);
 
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return Image.network(
