@@ -4,6 +4,7 @@ import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -224,120 +225,223 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     super.dispose();
   }
 
+  Widget _buildSectionCard({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: SoftDecorations.floatingCard(),
+      child: child,
+    );
+  }
+
+  Widget _buildFlavorPillsPreview() {
+    if (selectedFlavors.isEmpty) {
+      return Text(
+        '还没有添加口味标签',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: SoftPalette.textSecondary),
+      );
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: selectedFlavors.map((Flavor flavor) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: const BoxDecoration(
+            color: SoftPalette.tagBackground,
+            borderRadius: SoftRadius.tag,
+          ),
+          child: Text(
+            _getFlavorLabel(flavor),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: SoftPalette.tagForeground),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Create DishMark")),
+      appBar: AppBar(title: const Text('记录这一餐')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
         child: SingleChildScrollView(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: storeController,
-                decoration: const InputDecoration(
-                  labelText: "Store Name | Location",
+              Text('写下一次被记住的味道', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              Text(
+                '轻轻记录，不需要一次写完',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: SoftPalette.textSecondary,
                 ),
               ),
-              TextField(
-                controller: dishController,
-                decoration: const InputDecoration(labelText: "Dish Name"),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<QueueLevel>(
-                value: _selectedQueueLevel,
-                decoration: const InputDecoration(
-                  labelText: "排队时长 (Queue Level)",
+              const SizedBox(height: 14),
+              _buildSectionCard(
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: storeController,
+                      decoration: const InputDecoration(labelText: '店名 / 地点'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: dishController,
+                      decoration: const InputDecoration(labelText: '吃了什么'),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<QueueLevel>(
+                      initialValue: _selectedQueueLevel,
+                      decoration: const InputDecoration(labelText: '排队感受'),
+                      items: QueueLevel.values.map((level) {
+                        return DropdownMenuItem<QueueLevel>(
+                          value: level,
+                          child: Text(_getQueueLevelLabel(level)),
+                        );
+                      }).toList(),
+                      onChanged: (QueueLevel? value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setState(() {
+                          _selectedQueueLevel = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceController,
+                      decoration: const InputDecoration(labelText: '人均价格'),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                    ),
+                  ],
                 ),
-                items: QueueLevel.values.map((level) {
-                  return DropdownMenuItem<QueueLevel>(
-                    value: level,
-                    child: Text(_getQueueLevelLabel(level)),
-                  );
-                }).toList(),
-                onChanged: (QueueLevel? value) {
-                  if (value == null) {
-                    return;
-                  }
-                  setState(() {
-                    _selectedQueueLevel = value;
-                  });
-                },
+              ),
+              const SizedBox(height: 14),
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _selectedImagePath == null ? '还没有选择图片' : '已选择一张图片',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonalIcon(
+                          onPressed: _isPickingImage
+                              ? null
+                              : _pickImageAndSaveToSandbox,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: SoftPalette.accentOrangeSoft,
+                            foregroundColor: SoftPalette.textPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: const Icon(Icons.photo_library_outlined),
+                          label: Text(_isPickingImage ? '选择中' : '选图'),
+                        ),
+                      ],
+                    ),
+                    if (_selectedImagePath != null) ...[
+                      const SizedBox(height: 12),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.file(
+                          File(_selectedImagePath!),
+                          height: 180,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              height: 180,
+                              width: double.infinity,
+                              alignment: Alignment.center,
+                              color: SoftPalette.surfaceElevated,
+                              child: const Text('图片加载失败'),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              _buildSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: flavorsController,
+                      decoration: const InputDecoration(
+                        labelText: '口味标签',
+                        hintText: '选择口味印象',
+                        suffixIcon: Icon(Icons.chevron_right_rounded),
+                      ),
+                      readOnly: true,
+                      onTap: _selectFlavors,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildFlavorPillsPreview(),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: experienceController,
+                      decoration: const InputDecoration(
+                        labelText: '今日感受',
+                        hintText: '留下一句记忆里的味道',
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _selectedImagePath == null
-                          ? '未选择图片'
-                          : _selectedImagePath!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              _buildSectionCard(
+                child: Row(
+                  children: [
+                    const Icon(Icons.place_outlined, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.currentLocation == null
+                            ? '当前位置还没准备好'
+                            : '当前位置 ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: SoftPalette.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: SoftPalette.accentOrange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: _isPickingImage
-                        ? null
-                        : _pickImageAndSaveToSandbox,
-                    icon: const Icon(Icons.photo_library_outlined),
-                    label: Text(_isPickingImage ? '选择中...' : '选择图片'),
-                  ),
-                ],
-              ),
-              if (_selectedImagePath != null) ...[
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    File(_selectedImagePath!),
-                    height: 160,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 160,
-                        width: double.infinity,
-                        alignment: Alignment.center,
-                        color: Colors.grey.shade200,
-                        child: const Text('图片加载失败'),
-                      );
-                    },
-                  ),
-                ),
-              ],
-              TextField(
-                controller: priceController,
-                decoration: const InputDecoration(
-                  labelText: "价格 (Price Level)",
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              TextField(
-                controller: flavorsController,
-                decoration: const InputDecoration(labelText: "口味 (Flavors)"),
-                readOnly: true,
-                onTap: _selectFlavors,
-              ),
-              TextField(
-                controller: experienceController,
-                decoration: const InputDecoration(
-                  labelText: "用餐体验 (Experience Note)",
-                  hintText: "输入您的用餐体验...",
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  widget.currentLocation == null
-                      ? '当前位置: 未获取'
-                      : '当前位置: ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
+                  child: const Text('保存这段记忆'),
                 ),
               ),
-              ElevatedButton(onPressed: save, child: const Text("Save")),
             ],
           ),
         ),
@@ -386,51 +490,64 @@ class _FlavorSelectionDialogState extends State<_FlavorSelectionDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text('选择口味', style: Theme.of(context).textTheme.titleLarge),
-          ),
-          ...Flavor.values.map(
-            (flavor) => CheckboxListTile(
-              title: Text(_getFlavorLabel(flavor)),
-              value: _tempSelection.contains(flavor),
-              onChanged: (isSelected) {
-                setState(() {
-                  if (isSelected == true) {
-                    if (!_tempSelection.contains(flavor)) {
-                      _tempSelection.add(flavor);
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        decoration: SoftDecorations.floatingCard(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+              child: Text(
+                '选择口味',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            ...Flavor.values.map(
+              (flavor) => CheckboxListTile(
+                activeColor: SoftPalette.accentOrange,
+                title: Text(_getFlavorLabel(flavor)),
+                value: _tempSelection.contains(flavor),
+                onChanged: (isSelected) {
+                  setState(() {
+                    if (isSelected == true) {
+                      if (!_tempSelection.contains(flavor)) {
+                        _tempSelection.add(flavor);
+                      }
+                    } else {
+                      _tempSelection.remove(flavor);
                     }
-                  } else {
-                    _tempSelection.remove(flavor);
-                  }
-                });
-              },
+                  });
+                },
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context, _tempSelection);
-                  },
-                  child: const Text('确定'),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context, _tempSelection);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: SoftPalette.accentOrange,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('确定'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

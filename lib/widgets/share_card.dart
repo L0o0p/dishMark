@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/wechat_service.dart';
+import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -27,10 +28,7 @@ Future<void> showDishShareSheet({
 }
 
 class _DishShareSheet extends StatefulWidget {
-  const _DishShareSheet({
-    required this.dish,
-    required this.store,
-  });
+  const _DishShareSheet({required this.dish, required this.store});
 
   final DishMark dish;
   final Store? store;
@@ -41,8 +39,8 @@ class _DishShareSheet extends StatefulWidget {
 
 class _DishShareSheetState extends State<_DishShareSheet> {
   static const List<List<Color>> _templateGradients = <List<Color>>[
-    <Color>[Color(0xFFFFF2DF), Color(0xFFFFD2A5)],
-    <Color>[Color(0xFFEEF6FF), Color(0xFFCFE6FF)],
+    <Color>[Color(0xFFFFF7EC), Color(0xFFFBE5CF)],
+    <Color>[Color(0xFFFFF3E8), Color(0xFFF3E4D5)],
   ];
 
   final PageController _pageController = PageController();
@@ -94,7 +92,10 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     final String storeName = widget.store?.storeName.trim().isNotEmpty == true
         ? widget.store!.storeName
         : '未知店铺';
-    final String tags = widget.dish.flavors.take(4).map(_formatFlavor).join(' / ');
+    final String tags = widget.dish.flavors
+        .take(4)
+        .map(_formatFlavor)
+        .join(' / ');
     final String note = (widget.dish.experienceNote ?? '').trim();
     return '推荐菜：${widget.dish.dishName}\n'
         '店铺：$storeName\n'
@@ -107,12 +108,9 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     try {
       FocusManager.instance.primaryFocus?.unfocus();
       await WidgetsBinding.instance.endOfFrame;
-      final GlobalKey boundaryKey = _cardBoundaryKeys[_currentTemplate];
-      final BuildContext? boundaryContext = boundaryKey.currentContext;
-      if (boundaryContext == null) {
-        return null;
-      }
-      final RenderObject? renderObject = boundaryContext.findRenderObject();
+      final RenderObject? renderObject = _cardBoundaryKeys[_currentTemplate]
+          .currentContext
+          ?.findRenderObject();
       if (renderObject is! RenderRepaintBoundary) {
         return null;
       }
@@ -210,9 +208,9 @@ class _DishShareSheetState extends State<_DishShareSheet> {
         return;
       }
       if (imageFile == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('分享图片生成失败，请重试')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('分享图片生成失败，请重试')));
         return;
       }
 
@@ -257,17 +255,16 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('分享失败，请稍后重试')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('分享失败，请稍后重试')));
       debugPrint('share image failed: $error');
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isSharingImage = false;
+        });
       }
-      setState(() {
-        _isSharingImage = false;
-      });
     }
   }
 
@@ -276,9 +273,9 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('分享文案已复制到剪贴板')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('分享文案已复制到剪贴板')));
   }
 
   @override
@@ -323,24 +320,17 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     return SizedBox(
       width: double.infinity,
       height: height,
-      child: ClipRRect(
-        borderRadius: borderRadius,
-        child: image,
-      ),
+      child: ClipRRect(borderRadius: borderRadius, child: image),
     );
   }
 
-  Widget _buildFlavorPills({
-    required Color background,
-    required Color foreground,
-    required int maxCount,
-  }) {
+  Widget _buildFlavorPills({required int maxCount}) {
     final List<Flavor> flavors = widget.dish.flavors;
     if (flavors.isEmpty) {
       return Text(
         '还没有口味标签',
-        style: TextStyle(
-          color: foreground.withValues(alpha: 0.8),
+        style: const TextStyle(
+          color: SoftPalette.textSecondary,
           fontWeight: FontWeight.w500,
         ),
       );
@@ -352,14 +342,14 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       children: flavors.take(maxCount).map((Flavor flavor) {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(999),
+          decoration: const BoxDecoration(
+            color: SoftPalette.tagBackground,
+            borderRadius: SoftRadius.tag,
           ),
           child: Text(
             _formatFlavor(flavor),
-            style: TextStyle(
-              color: foreground,
+            style: const TextStyle(
+              color: SoftPalette.tagForeground,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -384,13 +374,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
             end: Alignment.bottomRight,
             colors: colors,
           ),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x24000000),
-              blurRadius: 18,
-              offset: Offset(0, 10),
-            ),
-          ],
+          boxShadow: SoftShadow.floating,
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -406,6 +390,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
+                  color: SoftPalette.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -415,16 +400,12 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 15,
-                  color: Color(0xFF5C4B36),
+                  color: SoftPalette.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 10),
-              _buildFlavorPills(
-                background: const Color(0xFF4B00C9),
-                foreground: Colors.white,
-                maxCount: 3,
-              ),
+              _buildFlavorPills(maxCount: 3),
             ],
           ),
         ),
@@ -439,13 +420,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
           end: Alignment.bottomRight,
           colors: colors,
         ),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x20000000),
-            blurRadius: 20,
-            offset: Offset(0, 12),
-          ),
-        ],
+        boxShadow: SoftShadow.floating,
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -453,9 +428,9 @@ class _DishShareSheetState extends State<_DishShareSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              'DishMark 推荐',
-              style: TextStyle(
-                color: Colors.black.withValues(alpha: 0.65),
+              '这顿很值得记住',
+              style: const TextStyle(
+                color: SoftPalette.textSecondary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -475,6 +450,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                             fontSize: 24,
                             height: 1.1,
                             fontWeight: FontWeight.w800,
+                            color: SoftPalette.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -483,7 +459,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.black.withValues(alpha: 0.65),
+                            color: SoftPalette.textSecondary,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
@@ -494,6 +470,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
+                            color: SoftPalette.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -502,7 +479,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.black.withValues(alpha: 0.8),
+                            color: SoftPalette.textSecondary,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -520,11 +497,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
               ),
             ),
             const SizedBox(height: 10),
-            _buildFlavorPills(
-              background: const Color(0xFF1C2733),
-              foreground: Colors.white,
-              maxCount: 2,
-            ),
+            _buildFlavorPills(maxCount: 2),
           ],
         ),
       ),
@@ -541,10 +514,10 @@ class _DishShareSheetState extends State<_DishShareSheet> {
         onPressed: onPressed,
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 12),
-          backgroundColor: const Color(0xFFF2F4F8),
-          foregroundColor: const Color(0xFF253142),
+          backgroundColor: SoftPalette.surfaceElevated,
+          foregroundColor: SoftPalette.textPrimary,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
         icon: Icon(icon),
@@ -563,7 +536,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     return Container(
       height: sheetHeight,
       decoration: const BoxDecoration(
-        color: Color(0xFFF7F8FB),
+        color: SoftPalette.background,
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       child: Padding(
@@ -574,7 +547,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
               width: 54,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFCCD2DA),
+                color: SoftPalette.textSecondary.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
@@ -585,14 +558,18 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                 children: <Widget>[
                   const Text(
                     '分享卡片预览',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: SoftPalette.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '左右滑动切换模板',
+                  const Text(
+                    '左右滑动，挑一张最像此刻心情的卡片',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.black.withValues(alpha: 0.55),
+                      color: SoftPalette.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -630,8 +607,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                         height: 8,
                         decoration: BoxDecoration(
                           color: selected
-                              ? const Color(0xFF1E2B3D)
-                              : const Color(0xFFBBC4CF),
+                              ? SoftPalette.accentOrange
+                              : SoftPalette.outline,
                           borderRadius: BorderRadius.circular(99),
                         ),
                       );
@@ -643,23 +620,17 @@ class _DishShareSheetState extends State<_DishShareSheet> {
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const <BoxShadow>[
-                  BoxShadow(
-                    color: Color(0x12000000),
-                    blurRadius: 16,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
+              decoration: SoftDecorations.floatingCard(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   const Text(
                     '系统分享渠道',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: SoftPalette.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(

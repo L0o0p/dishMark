@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
@@ -9,6 +8,7 @@ import 'package:dishmark/page/create_dish_mark.dart';
 import 'package:dishmark/page/dish_list.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:dishmark/widgets/dialogs.dart';
 import 'package:dishmark/widgets/draggable_scrollable_sheet.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +26,7 @@ class DishMap extends StatefulWidget {
 class _DishMapState extends State<DishMap> {
   static const String _dishIconAssetPath = 'assets/logo.jpg';
   static const int _dishIconSizePx = 72;
+  static const bool _showPoiDebugPanel = false;
   static const List<double> _appearScales = <double>[
     0.20,
     0.34,
@@ -149,21 +150,20 @@ class _DishMapState extends State<DishMap> {
     try {
       _dishMarkerIcon = await _getDishMarkerIconByScale(1.0);
     } catch (e) {
-      debugPrint('Failed to build resized marker icon: $e');
+      debugPrint('Failed to build memory marker icon: $e');
       _dishMarkerIcon = BitmapDescriptor.defaultMarker;
     }
     await loadDishMarkers();
   }
 
   Future<BitmapDescriptor> _getDishMarkerIconByScale(double scale) async {
-    final int targetSizePx =
-        ((_dishIconSizePx * scale).round()).clamp(1, 1024) as int;
+    final int targetSizePx = ((_dishIconSizePx * scale).round()).clamp(1, 1024);
     final BitmapDescriptor? cachedIcon = _dishMarkerIconCache[targetSizePx];
     if (cachedIcon != null) {
       return cachedIcon;
     }
 
-    final BitmapDescriptor icon = await _buildResizedMarkerIcon(
+    final BitmapDescriptor icon = await _buildMemoryMarkerIcon(
       assetPath: _dishIconAssetPath,
       targetSizePx: targetSizePx,
     );
@@ -171,25 +171,96 @@ class _DishMapState extends State<DishMap> {
     return icon;
   }
 
-  Future<BitmapDescriptor> _buildResizedMarkerIcon({
+  Future<BitmapDescriptor> _buildMemoryMarkerIcon({
     required String assetPath,
     required int targetSizePx,
   }) async {
     final ByteData byteData = await rootBundle.load(assetPath);
     final Uint8List rawBytes = byteData.buffer.asUint8List();
+    final int photoSize = (targetSizePx * 0.66).round().clamp(1, 1024);
 
     final ui.Codec codec = await ui.instantiateImageCodec(
       rawBytes,
-      targetWidth: targetSizePx,
-      targetHeight: targetSizePx,
+      targetWidth: photoSize,
+      targetHeight: photoSize,
     );
     final ui.FrameInfo frame = await codec.getNextFrame();
     codec.dispose();
+    final ui.Image photo = frame.image;
 
-    final ByteData? pngData = await frame.image.toByteData(
+    final double size = targetSizePx.toDouble();
+    final ui.PictureRecorder recorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
+
+    final Paint shadowPaint = Paint()
+      ..color = const Color(0x1A000000)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, size * 0.08);
+    canvas.drawCircle(
+      Offset(size * 0.5, size * 0.62),
+      size * 0.33,
+      shadowPaint,
+    );
+
+    final RRect shell = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size * 0.08, size * 0.08, size * 0.84, size * 0.84),
+      Radius.circular(size * 0.28),
+    );
+    canvas.drawRRect(shell, Paint()..color = SoftPalette.surface);
+    canvas.drawRRect(
+      shell,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = size * 0.02
+        ..color = SoftPalette.outline.withValues(alpha: 0.72),
+    );
+
+    final RRect tape = RRect.fromRectAndRadius(
+      Rect.fromLTWH(size * 0.36, size * 0.03, size * 0.28, size * 0.12),
+      Radius.circular(size * 0.06),
+    );
+    canvas.drawRRect(tape, Paint()..color = const Color(0xFFE9D8C6));
+
+    final Rect photoRect = Rect.fromLTWH(
+      size * 0.18,
+      size * 0.19,
+      size * 0.64,
+      size * 0.56,
+    );
+    final RRect photoClip = RRect.fromRectAndRadius(
+      photoRect,
+      Radius.circular(size * 0.18),
+    );
+    canvas.save();
+    canvas.clipRRect(photoClip);
+    canvas.drawImageRect(
+      photo,
+      Rect.fromLTWH(0, 0, photo.width.toDouble(), photo.height.toDouble()),
+      photoRect,
+      Paint(),
+    );
+    canvas.restore();
+
+    canvas.drawCircle(
+      Offset(size * 0.74, size * 0.74),
+      size * 0.075,
+      Paint()..color = SoftPalette.accentOrange,
+    );
+    canvas.drawCircle(
+      Offset(size * 0.74, size * 0.74),
+      size * 0.03,
+      Paint()..color = Colors.white.withValues(alpha: 0.84),
+    );
+
+    final ui.Image marker = await recorder.endRecording().toImage(
+      targetSizePx,
+      targetSizePx,
+    );
+
+    final ByteData? pngData = await marker.toByteData(
       format: ui.ImageByteFormat.png,
     );
-    frame.image.dispose();
+    photo.dispose();
+    marker.dispose();
     if (pngData == null) {
       throw StateError('Failed to encode marker icon to PNG bytes.');
     }
@@ -336,6 +407,27 @@ class _DishMapState extends State<DishMap> {
     );
   }
 
+  Widget _buildMapActionButton({
+    required String heroTag,
+    required IconData icon,
+    required Future<void> Function() onPressed,
+    bool emphasized = false,
+  }) {
+    return FloatingActionButton.small(
+      heroTag: heroTag,
+      onPressed: () {
+        unawaited(onPressed());
+      },
+      backgroundColor: emphasized
+          ? SoftPalette.accentOrangeSoft
+          : SoftPalette.surface,
+      foregroundColor: SoftPalette.textPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 0,
+      child: Icon(icon),
+    );
+  }
+
   Future<void> _focusDishMarkerAndOpenSheet(int dishId) async {
     Marker? marker = _dishMarkerMap[dishId];
     if (marker == null) {
@@ -370,7 +462,7 @@ class _DishMapState extends State<DishMap> {
         enableDrag: false,
         showDragHandle: false,
         builder: (_) => ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
           child: DraggableScrollableSheetExample(dishId: dishId),
         ),
       );
@@ -432,11 +524,13 @@ class _DishMapState extends State<DishMap> {
 
     final Set<Marker> allMarkers = <Marker>{
       ..._dishMarkerMap.values,
-      if (_myLocationMarker != null) _myLocationMarker!,
+      if (_myLocationMarker case final Marker myLocationMarker)
+        myLocationMarker,
     };
     final bool hasOnlyMyLocationMarker =
         allMarkers.isEmpty ||
         (allMarkers.length == 1 && _myLocationMarker != null);
+    final int memoryCount = _dishMarkerMap.length;
 
     return Scaffold(
       body: Stack(
@@ -453,7 +547,7 @@ class _DishMapState extends State<DishMap> {
                         position: latLng,
                         zIndex: 0,
                         icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueAzure,
+                          BitmapDescriptor.hueOrange,
                         ),
                         infoWindow: const InfoWindow(title: '当前位置'),
                       )
@@ -477,8 +571,12 @@ class _DishMapState extends State<DishMap> {
             },
             myLocationStyleOptions: MyLocationStyleOptions(
               true,
-              circleFillColor: Colors.lightBlue,
-              circleStrokeColor: Colors.blue,
+              circleFillColor: SoftPalette.accentOrangeSoft.withValues(
+                alpha: 0.3,
+              ),
+              circleStrokeColor: SoftPalette.accentOrange.withValues(
+                alpha: 0.6,
+              ),
               circleStrokeWidth: 1,
             ),
             touchPoiEnabled: true,
@@ -501,85 +599,124 @@ class _DishMapState extends State<DishMap> {
             ),
             markers: allMarkers,
           ),
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: SoftDecorations.floatingCard(
+                  color: SoftPalette.surface.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: SoftPalette.accentOrange,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        memoryCount == 0
+                            ? '今天想把哪一口味道记下来？'
+                            : '已经留下 $memoryCount 条味觉记忆',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: SoftPalette.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           if (hasOnlyMyLocationMarker)
             const Positioned.fill(
               child: IgnorePointer(
                 child: AppEmptyHint(message: "你还没有记录任何美食\n快去 mark 你的第一个吧 🍜"),
               ),
             ),
-          SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'POI: ${_lastPoiName ?? '（暂无）'}\nTap: ${_lastTapLatLng == null ? '（暂无）' : '${_lastTapLatLng!.latitude.toStringAsFixed(5)}, ${_lastTapLatLng!.longitude.toStringAsFixed(5)}'}\nMe: ${_myLatLng == null ? '（暂无）' : '${_myLatLng!.latitude.toStringAsFixed(5)}, ${_myLatLng!.longitude.toStringAsFixed(5)}'}',
-                  style: const TextStyle(color: Colors.white),
+          if (_showPoiDebugPanel)
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: SoftPalette.textPrimary.withValues(alpha: 0.84),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    'POI: ${_lastPoiName ?? '（暂无）'}\nTap: ${_lastTapLatLng == null ? '（暂无）' : '${_lastTapLatLng!.latitude.toStringAsFixed(5)}, ${_lastTapLatLng!.longitude.toStringAsFixed(5)}'}\nMe: ${_myLatLng == null ? '（暂无）' : '${_myLatLng!.latitude.toStringAsFixed(5)}, ${_myLatLng!.longitude.toStringAsFixed(5)}'}',
+                    style: const TextStyle(color: SoftPalette.surface),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
-      floatingActionButton: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            heroTag: 'go_my_location_fab',
-            onPressed: _goToMyLocation,
-            foregroundColor: Colors.black,
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.my_location),
-          ),
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            heroTag: 'add_mark_fab',
-            onPressed: () async {
-              final DishMark? newDish = await Navigator.push<DishMark>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CreateDishMark(
-                    currentLocation: _lastTapLatLng ?? _myLatLng,
-                    initialStoreName: _lastPoiName,
+      floatingActionButton: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: SoftDecorations.floatingCard(
+          color: SoftPalette.surface.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildMapActionButton(
+              heroTag: 'go_my_location_fab',
+              icon: Icons.my_location_outlined,
+              onPressed: () async {
+                _goToMyLocation();
+              },
+            ),
+            const SizedBox(width: 12),
+            _buildMapActionButton(
+              heroTag: 'add_mark_fab',
+              icon: Icons.add_rounded,
+              emphasized: true,
+              onPressed: () async {
+                final DishMark? newDish = await Navigator.push<DishMark>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateDishMark(
+                      currentLocation: _lastTapLatLng ?? _myLatLng,
+                      initialStoreName: _lastPoiName,
+                    ),
                   ),
-                ),
-              );
-              if (newDish != null) {
-                await _playAppearAnimation(newDish);
-              }
-            },
-            foregroundColor: Colors.black,
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.add),
-          ),
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            heroTag: 'view_mark_list',
-            onPressed: () async {
-              final int? selectedDishId = await Navigator.push<int>(
-                context,
-                MaterialPageRoute(builder: (_) => DishMarkList()),
-              );
-              _consumePendingDeletedMarkersIfVisible();
-              if (selectedDishId != null) {
-                await _focusDishMarkerAndOpenSheet(selectedDishId);
-              }
-            },
-            foregroundColor: Colors.black,
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.list),
-          ),
-        ],
+                );
+                if (newDish != null) {
+                  await _playAppearAnimation(newDish);
+                }
+              },
+            ),
+            const SizedBox(width: 12),
+            _buildMapActionButton(
+              heroTag: 'view_mark_list',
+              icon: Icons.menu_book_rounded,
+              onPressed: () async {
+                final int? selectedDishId = await Navigator.push<int>(
+                  context,
+                  MaterialPageRoute(builder: (_) => DishMarkList()),
+                );
+                _consumePendingDeletedMarkersIfVisible();
+                if (selectedDishId != null) {
+                  await _focusDishMarkerAndOpenSheet(selectedDishId);
+                }
+              },
+            ),
+          ],
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
