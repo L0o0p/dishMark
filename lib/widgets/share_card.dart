@@ -381,8 +381,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _buildDishImage(height: 210),
-              const SizedBox(height: 14),
+              Expanded(child: _buildDishImage()),
+              const SizedBox(height: 12),
               Text(
                 widget.dish.dishName,
                 maxLines: 2,
@@ -404,8 +404,8 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 10),
-              _buildFlavorPills(maxCount: 3),
+              const SizedBox(height: 8),
+              _buildFlavorPills(maxCount: 2),
             ],
           ),
         ),
@@ -425,6 +425,7 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
@@ -435,69 +436,69 @@ class _DishShareSheetState extends State<_DishShareSheet> {
               ),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          widget.dish.dishName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            height: 1.1,
-                            fontWeight: FontWeight.w800,
-                            color: SoftPalette.textPrimary,
-                          ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        widget.dish.dishName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          color: SoftPalette.textPrimary,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          storeName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: SoftPalette.textSecondary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        storeName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SoftPalette.textSecondary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const Spacer(),
-                        Text(
-                          '人均：${_formatPrice(widget.dish.priceLevel)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: SoftPalette.textPrimary,
-                          ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        '人均：${_formatPrice(widget.dish.priceLevel)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: SoftPalette.textPrimary,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '简评：${_formatNote(widget.dish.experienceNote)}',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: SoftPalette.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '简评：${_formatNote(widget.dish.experienceNote)}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: SoftPalette.textSecondary,
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 10),
+                      _buildFlavorPills(maxCount: 2),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 120,
-                    child: _buildDishImage(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 132,
+                  height: 132,
+                  child: _buildDishImage(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            _buildFlavorPills(maxCount: 2),
           ],
         ),
       ),
