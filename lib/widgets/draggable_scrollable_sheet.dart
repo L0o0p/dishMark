@@ -5,6 +5,7 @@ import 'package:dishmark/data/store.dart';
 import 'package:dishmark/page/dish_mark_detail.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:dishmark/widgets/share_card.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
@@ -158,15 +159,19 @@ class _DraggableScrollableSheetExampleState
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('删除条目'),
-          content: const Text('确认删除这条菜品记录吗？'),
+          title: const Text('删除记录'),
+          content: const Text('确认删除这条菜品记忆吗？'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('取消'),
             ),
-            TextButton(
+            FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: SoftPalette.danger,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('删除'),
             ),
           ],
@@ -236,16 +241,16 @@ class _DraggableScrollableSheetExampleState
       runSpacing: 8,
       children: visible.map((Flavor flavor) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: const BoxDecoration(
-            color: Color(0xFF4B00C9),
-            borderRadius: BorderRadius.all(Radius.circular(999)),
+            color: SoftPalette.tagBackground,
+            borderRadius: SoftRadius.tag,
           ),
           child: Text(
             _formatFlavor(flavor),
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
+              color: SoftPalette.tagForeground,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -279,17 +284,15 @@ class _DraggableScrollableSheetExampleState
                 mark.dishName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
                 '📍 $storeName',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: Color(0xFF7D7D7D),
-                  fontWeight: FontWeight.w500,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: SoftPalette.textSecondary,
                 ),
               ),
               const SizedBox(height: 10),
@@ -318,15 +321,15 @@ class _DraggableScrollableSheetExampleState
             Expanded(
               child: Text(
                 mark.dishName,
-                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
             const SizedBox(width: 12),
             IconButton.filledTonal(
               onPressed: _shareDish,
               style: IconButton.styleFrom(
-                backgroundColor: const Color(0xFFF1F1F1),
-                foregroundColor: Colors.black,
+                backgroundColor: SoftPalette.accentOrangeSoft,
+                foregroundColor: SoftPalette.textPrimary,
               ),
               icon: const Icon(Icons.ios_share_outlined),
             ),
@@ -335,11 +338,9 @@ class _DraggableScrollableSheetExampleState
         const SizedBox(height: 8),
         Text(
           '📍 $storeName',
-          style: const TextStyle(
-            fontSize: 20,
-            color: Color(0xFF7D7D7D),
-            fontWeight: FontWeight.w500,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: SoftPalette.textSecondary),
         ),
         const SizedBox(height: 12),
         _buildFlavorPills(maxCount: 4),
@@ -349,32 +350,25 @@ class _DraggableScrollableSheetExampleState
           height: 360,
           borderRadius: const BorderRadius.all(Radius.circular(28)),
         ),
-        const SizedBox(height: 24),
-        Text(
-          '价格：${_formatPrice(mark.priceLevel)}',
-          style: const TextStyle(fontSize: 18),
+        const SizedBox(height: 18),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: SoftDecorations.floatingCard(color: SoftPalette.surface),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('人均：${_formatPrice(mark.priceLevel)}'),
+              const SizedBox(height: 8),
+              Text('排队时长：${_formatQueueLevel(_store?.queueLevel)}'),
+              const SizedBox(height: 8),
+              Text('简评：${_formatNote(mark.experienceNote)}'),
+              const SizedBox(height: 8),
+              Text('上一次品尝：${_formatDate(mark.lastTastedAt)}'),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          '排队时长：${_formatQueueLevel(_store?.queueLevel)}',
-          style: const TextStyle(fontSize: 18),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '简评：${_formatNote(mark.experienceNote)}',
-          style: const TextStyle(fontSize: 18),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '上一次品尝：${_formatDate(mark.lastTastedAt)}',
-          style: const TextStyle(fontSize: 18),
-        ),
-        const SizedBox(height: 12),
-        // Text(
-        //   '图片路径：${mark.imagePath.trim().isEmpty ? '-' : mark.imagePath.trim()}',
-        //   style: const TextStyle(fontSize: 18),
-        // ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
         Row(
           children: <Widget>[
             Expanded(
@@ -382,6 +376,10 @@ class _DraggableScrollableSheetExampleState
                 onPressed: _shareDish,
                 icon: const Icon(Icons.share_outlined),
                 label: const Text('分享'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: SoftPalette.surfaceElevated,
+                  foregroundColor: SoftPalette.textPrimary,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -390,6 +388,10 @@ class _DraggableScrollableSheetExampleState
                 onPressed: _editDish,
                 icon: const Icon(Icons.edit_outlined),
                 label: const Text('编辑'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: SoftPalette.surfaceElevated,
+                  foregroundColor: SoftPalette.textPrimary,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -400,7 +402,7 @@ class _DraggableScrollableSheetExampleState
                 label: const Text('删除'),
                 style: FilledButton.styleFrom(
                   foregroundColor: Colors.white,
-                  backgroundColor: Colors.red.shade700,
+                  backgroundColor: SoftPalette.danger,
                 ),
               ),
             ),
@@ -435,8 +437,8 @@ class _DraggableScrollableSheetExampleState
         builder: (BuildContext context, ScrollController scrollController) {
           return DecoratedBox(
             decoration: const BoxDecoration(
-              color: Color(0xFFF7F7F8),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              color: SoftPalette.background,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
             ),
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -453,7 +455,9 @@ class _DraggableScrollableSheetExampleState
                               width: 64,
                               height: 6,
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.2),
+                                color: SoftPalette.textSecondary.withValues(
+                                  alpha: 0.35,
+                                ),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                             ),
