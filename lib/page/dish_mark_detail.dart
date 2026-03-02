@@ -2,6 +2,7 @@ import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';
 
@@ -32,6 +33,35 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     }
   }
 
+  String _formatFlavor(Flavor flavor) {
+    switch (flavor) {
+      case Flavor.spicy:
+        return '辛辣';
+      case Flavor.sweet:
+        return '甜';
+      case Flavor.savory:
+        return '咸鲜';
+      case Flavor.sour:
+        return '酸';
+      case Flavor.bitter:
+        return '苦';
+      case Flavor.fresh:
+        return '清新';
+      case Flavor.greasy:
+        return '油润';
+    }
+  }
+
+  String _formatPrice(double? price) {
+    if (price == null) {
+      return '-';
+    }
+    if (price == price.roundToDouble()) {
+      return '￥${price.toStringAsFixed(0)}';
+    }
+    return '￥${price.toStringAsFixed(1)}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -54,15 +84,19 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除条目'),
-          content: const Text('确认删除这条菜品记录吗？'),
+          title: const Text('删除记录'),
+          content: const Text('确认删除这条菜品记忆吗？'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('取消'),
             ),
-            TextButton(
+            FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: SoftPalette.danger,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('删除'),
             ),
           ],
@@ -103,7 +137,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('编辑条目'),
+          title: const Text('编辑记录'),
           content: SingleChildScrollView(
             child: StatefulBuilder(
               builder: (context, setDialogState) {
@@ -112,10 +146,10 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                   children: [
                     TextField(
                       controller: storeController,
-                      decoration: const InputDecoration(labelText: 'Store Name'),
+                      decoration: const InputDecoration(labelText: '店名'),
                     ),
                     DropdownButtonFormField<QueueLevel>(
-                      value: selectedQueueLevel,
+                      initialValue: selectedQueueLevel,
                       decoration: const InputDecoration(labelText: '排队时长'),
                       items: QueueLevel.values.map((QueueLevel level) {
                         return DropdownMenuItem<QueueLevel>(
@@ -134,19 +168,19 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                     ),
                     TextField(
                       controller: dishController,
-                      decoration: const InputDecoration(labelText: 'Dish Name'),
+                      decoration: const InputDecoration(labelText: '菜名'),
                     ),
                     TextField(
                       controller: priceController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '价格 (Price Level)',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
+                      decoration: const InputDecoration(labelText: '人均价格'),
                     ),
                     TextField(
                       controller: noteController,
                       maxLines: 3,
-                      decoration: const InputDecoration(labelText: '用餐体验 (Note)'),
+                      decoration: const InputDecoration(labelText: '用餐感受'),
                     ),
                   ],
                 );
@@ -158,8 +192,12 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('取消'),
             ),
-            TextButton(
+            FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: SoftPalette.accentOrange,
+                foregroundColor: Colors.white,
+              ),
               child: const Text('保存'),
             ),
           ],
@@ -196,7 +234,10 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     double? priceValue;
     if (priceText.isNotEmpty) {
       priceValue = double.tryParse(priceText);
-      if (priceValue == null || priceValue.isNaN || priceValue.isInfinite || priceValue < 0) {
+      if (priceValue == null ||
+          priceValue.isNaN ||
+          priceValue.isInfinite ||
+          priceValue < 0) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -260,49 +301,97 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     if (mark == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    final String storeName =
+        mark!.store.value?.storeName.trim().isNotEmpty == true
+        ? mark!.store.value!.storeName
+        : '还没有店名';
+    final String note = (mark!.experienceNote ?? '').trim();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(mark!.dishName),
         actions: [
           IconButton(
-            onPressed: _editMark, 
-            icon: const Icon(Icons.edit_outlined)),
+            onPressed: _editMark,
+            icon: const Icon(Icons.edit_outlined),
+          ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
         child: Column(
           children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
-                borderRadius: BorderRadius.circular(12),
-              ),
+              decoration: SoftDecorations.floatingCard(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Store: ${mark!.store.value?.storeName ?? '(no store)'}"),
+                  Text(
+                    '📍 $storeName',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 10),
-                  Text("Queue: ${_formatQueueLevel(mark!.store.value?.queueLevel)}"),
+                  Text(
+                    '排队感受：${_formatQueueLevel(mark!.store.value?.queueLevel)}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
                   const SizedBox(height: 10),
-                  Text("Price Level: ${mark!.priceLevel ?? "-"}"),
-                  const SizedBox(height: 10),
-                  Text("Flavors: ${mark!.flavors.map((f) => f.name).join(", ")}"),
-                  const SizedBox(height: 20),
-                  Text("Note: ${mark!.experienceNote ?? ""}"),
+                  Text(
+                    '人均：${_formatPrice(mark!.priceLevel)}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: mark!.flavors.map((flavor) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: const BoxDecoration(
+                          color: SoftPalette.tagBackground,
+                          borderRadius: SoftRadius.tag,
+                        ),
+                        child: Text(
+                          _formatFlavor(flavor),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: SoftPalette.tagForeground,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    note.isEmpty ? '还没有留下感受' : note,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: SoftPalette.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
             const Spacer(),
             SizedBox(
               width: double.infinity,
-              child: FilledButton.tonalIcon(
+              child: FilledButton.icon(
                 onPressed: _deleteMark,
                 icon: const Icon(Icons.delete_outline),
                 label: const Text('删除'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: SoftPalette.danger,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
               ),
             ),
           ],
