@@ -308,9 +308,13 @@ class _DishShareSheetState extends State<_DishShareSheet> {
       }
 
       await Share.shareXFiles(
-        <XFile>[XFile(imageFile.path)],
-        text: _buildShareText(),
-        subject: 'DishMark 分享：${widget.dish.dishName}',
+        <XFile>[
+          XFile(
+            imageFile.path,
+            name: 'dishmark_${widget.dish.id}_${_currentTemplate + 1}.png',
+            mimeType: 'image/png',
+          ),
+        ],
         sharePositionOrigin: _getSharePositionOrigin(),
       );
     } catch (error) {
