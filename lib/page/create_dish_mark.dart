@@ -28,13 +28,21 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   final TextEditingController dishController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
   final TextEditingController experienceController = TextEditingController();
-  final TextEditingController flavorsController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   DishMark? newDishMark;
   List<Flavor> selectedFlavors = [];
+  bool _isFlavorPanelExpanded = true;
   QueueLevel _selectedQueueLevel = QueueLevel.noQueue;
+  int _queueUiIndex = 0;
   String? _selectedImagePath;
   bool _isPickingImage = false;
+  static const List<String> _queueChoiceLabels = <String>[
+    '不用排队',
+    '< 30 min',
+    '< 60 min',
+    '> 60 min',
+    '建议预约',
+  ];
 
   @override
   void initState() {
@@ -43,23 +51,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     if (initialStoreName.isNotEmpty) {
       storeController.text = initialStoreName;
     }
-  }
-
-  Future<void> _selectFlavors() async {
-    final result = await showDialog<List<Flavor>>(
-      context: context,
-      builder: (BuildContext context) {
-        return _FlavorSelectionDialog(selectedFlavors: selectedFlavors);
-      },
-    );
-    if (result != null) {
-      setState(() {
-        selectedFlavors = result;
-      });
-      flavorsController.text = selectedFlavors
-          .map((flavor) => _getFlavorLabel(flavor))
-          .join(', ');
-    }
+    _queueUiIndex = _queueLevelToUiIndex(_selectedQueueLevel);
   }
 
   String _getFlavorLabel(Flavor flavor) {
@@ -81,17 +73,53 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     }
   }
 
-  String _getQueueLevelLabel(QueueLevel level) {
+  int _queueLevelToUiIndex(QueueLevel level) {
     switch (level) {
       case QueueLevel.noQueue:
-        return '几乎不用排队';
+        return 0;
       case QueueLevel.within30Min:
-        return '小于 30 分钟';
+        return 1;
       case QueueLevel.over1Hour:
-        return '大于 1 小时';
+        return 3;
       case QueueLevel.reservationNeeded:
-        return '建议预约';
+        return 4;
     }
+  }
+
+  QueueLevel _uiIndexToQueueLevel(int index) {
+    switch (index) {
+      case 0:
+        return QueueLevel.noQueue;
+      case 1:
+      case 2:
+        return QueueLevel.within30Min;
+      case 3:
+        return QueueLevel.over1Hour;
+      case 4:
+        return QueueLevel.reservationNeeded;
+      default:
+        return QueueLevel.noQueue;
+    }
+  }
+
+  void _updateQueueByUiIndex(int index) {
+    setState(() {
+      _queueUiIndex = index.clamp(0, _queueChoiceLabels.length - 1).toInt();
+      _selectedQueueLevel = _uiIndexToQueueLevel(_queueUiIndex);
+    });
+  }
+
+  void _fillStoreNameByGpsSuggestion() {
+    final String suggestion = widget.initialStoreName?.trim() ?? '';
+    if (suggestion.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('暂无可填入的附近店名')));
+      return;
+    }
+    setState(() {
+      storeController.text = suggestion;
+    });
   }
 
   Future<void> _pickImageAndSaveToSandbox() async {
@@ -157,6 +185,14 @@ class _CreateDishMarkState extends State<CreateDishMark> {
       return;
     }
 
+    final dishName = dishController.text.trim();
+    if (dishName.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请至少填写一个菜品名称')));
+      return;
+    }
+
     // 解析价格
     double? priceValue;
     final priceText = priceController.text.trim();
@@ -192,7 +228,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
 
       final now = DateTime.now();
       final dish = DishMark()
-        ..dishName = dishController.text
+        ..dishName = dishName
         ..store.value = store
         ..imagePath = imagePath
         ..priceLevel = priceValue
@@ -221,7 +257,6 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     dishController.dispose();
     priceController.dispose();
     experienceController.dispose();
-    flavorsController.dispose();
     super.dispose();
   }
 
@@ -233,33 +268,417 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     );
   }
 
-  Widget _buildFlavorPillsPreview() {
-    if (selectedFlavors.isEmpty) {
-      return Text(
-        '还没有添加口味标签',
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: SoftPalette.textSecondary),
-      );
-    }
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: selectedFlavors.map((Flavor flavor) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: const BoxDecoration(
-            color: SoftPalette.tagBackground,
-            borderRadius: SoftRadius.tag,
+  Widget _buildTitledSection({required String title, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        _buildSectionCard(child: child),
+      ],
+    );
+  }
+
+  void _toggleFlavor(Flavor flavor) {
+    setState(() {
+      if (selectedFlavors.contains(flavor)) {
+        selectedFlavors.remove(flavor);
+      } else {
+        selectedFlavors.add(flavor);
+      }
+    });
+  }
+
+  Widget _buildFlavorOptionChip(Flavor flavor) {
+    final bool isSelected = selectedFlavors.contains(flavor);
+    return GestureDetector(
+      onTap: () => _toggleFlavor(flavor),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFF6B00) : const Color(0xFFF2F2F2),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          _getFlavorLabel(flavor),
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: isSelected ? Colors.white : SoftPalette.textPrimary,
           ),
-          child: Text(
-            _getFlavorLabel(flavor),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFlavorSection() {
+    final String selectedText = selectedFlavors.isEmpty
+        ? '暂无选择口味标签'
+        : selectedFlavors.map((flavor) => _getFlavorLabel(flavor)).join('、');
+
+    return _buildTitledSection(
+      title: '口味标签',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            selectedText,
             style: Theme.of(
               context,
-            ).textTheme.labelLarge?.copyWith(color: SoftPalette.tagForeground),
+            ).textTheme.bodyMedium?.copyWith(color: SoftPalette.textSecondary),
           ),
-        );
-      }).toList(),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
+                    setState(() {
+                      _isFlavorPanelExpanded = !_isFlavorPanelExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 2,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '选择口味',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: SoftPalette.textSecondary),
+                          ),
+                        ),
+                        Icon(
+                          _isFlavorPanelExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: SoftPalette.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedCrossFade(
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: Flavor.values.map(_buildFlavorOptionChip).toList(),
+                    ),
+                  ),
+                  crossFadeState: _isFlavorPanelExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 160),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreSection() {
+    return _buildTitledSection(
+      title: '店名',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: storeController,
+                  decoration: const InputDecoration(hintText: '搜索或输入店名'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 44,
+                child: FilledButton.tonalIcon(
+                  onPressed: _fillStoreNameByGpsSuggestion,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFF2F2F2),
+                    foregroundColor: SoftPalette.textPrimary,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  icon: const Icon(Icons.pin_drop_outlined, size: 16),
+                  label: const Text('定位'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Icon(
+                Icons.refresh_rounded,
+                color: SoftPalette.accentOrange,
+                size: 17,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '基于当前位置 GPS 位置自动填充',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: SoftPalette.textSecondary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _fillStoreNameByGpsSuggestion,
+                style: TextButton.styleFrom(
+                  foregroundColor: SoftPalette.accentOrange,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(36, 28),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('填入'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDishPriceRow(
+    TextEditingController dishNameCtrl,
+    TextEditingController priceCtrl,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: dishNameCtrl,
+            decoration: const InputDecoration(hintText: '菜品名称'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 64,
+          child: TextField(
+            controller: priceCtrl,
+            textAlign: TextAlign.center,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              hintText: '¥',
+              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDishAndPriceSection() {
+    return _buildTitledSection(
+      title: '菜品与价格',
+      child: _buildDishPriceRow(dishController, priceController),
+    );
+  }
+
+  Widget _buildQueueSection() {
+    final selectedLabel = _queueChoiceLabels[_queueUiIndex];
+    return _buildTitledSection(
+      title: '排队时间',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '当前选择',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: SoftPalette.textSecondary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: SoftPalette.accentOrange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  selectedLabel,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: SoftPalette.accentOrange,
+              inactiveTrackColor: SoftPalette.outline.withValues(alpha: 0.6),
+              thumbColor: SoftPalette.surface,
+              overlayColor: SoftPalette.accentOrange.withValues(alpha: 0.12),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
+              trackHeight: 5,
+            ),
+            child: Slider(
+              value: _queueUiIndex.toDouble(),
+              min: 0,
+              max: (_queueChoiceLabels.length - 1).toDouble(),
+              divisions: _queueChoiceLabels.length - 1,
+              onChanged: (value) => _updateQueueByUiIndex(value.round()),
+            ),
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _queueChoiceLabels.asMap().entries.map((entry) {
+              final int index = entry.key;
+              final String label = entry.value;
+              final bool selected = index == _queueUiIndex;
+              final Color dotColor = selected
+                  ? SoftPalette.accentOrange
+                  : SoftPalette.outline;
+              final Color textColor = selected
+                  ? SoftPalette.accentOrange
+                  : SoftPalette.textSecondary;
+              return Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _updateQueueByUiIndex(index),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 2, bottom: 2),
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: dotColor,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: textColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageSection() {
+    return _buildTitledSection(
+      title: '图片',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _selectedImagePath == null ? '还没有选择图片' : '已选择一张图片',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: _isPickingImage ? null : _pickImageAndSaveToSandbox,
+                style: FilledButton.styleFrom(
+                  backgroundColor: SoftPalette.accentOrangeSoft,
+                  foregroundColor: SoftPalette.textPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.photo_library_outlined),
+                label: Text(_isPickingImage ? '选择中' : '选图'),
+              ),
+            ],
+          ),
+          if (_selectedImagePath != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.file(
+                File(_selectedImagePath!),
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 180,
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    color: SoftPalette.surfaceElevated,
+                    child: const Text('图片加载失败'),
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExperienceSection() {
+    return _buildTitledSection(
+      title: '今日感受',
+      child: TextField(
+        controller: experienceController,
+        decoration: const InputDecoration(hintText: '留下一句记忆里的味道'),
+        maxLines: 3,
+      ),
+    );
+  }
+
+  Widget _buildLocationSection() {
+    return _buildTitledSection(
+      title: '当前位置',
+      child: Row(
+        children: [
+          const Icon(Icons.place_outlined, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.currentLocation == null
+                  ? '当前位置还没准备好'
+                  : '当前位置 ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: SoftPalette.textSecondary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -273,159 +692,26 @@ class _CreateDishMarkState extends State<CreateDishMark> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('写下一次被记住的味道', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 6),
               Text(
-                '轻轻记录，不需要一次写完',
+                '码住一次被记住的味道～',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: SoftPalette.textSecondary,
                 ),
               ),
               const SizedBox(height: 14),
-              _buildSectionCard(
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: storeController,
-                      decoration: const InputDecoration(labelText: '店名 / 地点'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: dishController,
-                      decoration: const InputDecoration(labelText: '吃了什么'),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<QueueLevel>(
-                      initialValue: _selectedQueueLevel,
-                      decoration: const InputDecoration(labelText: '排队感受'),
-                      items: QueueLevel.values.map((level) {
-                        return DropdownMenuItem<QueueLevel>(
-                          value: level,
-                          child: Text(_getQueueLevelLabel(level)),
-                        );
-                      }).toList(),
-                      onChanged: (QueueLevel? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setState(() {
-                          _selectedQueueLevel = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: priceController,
-                      decoration: const InputDecoration(labelText: '人均价格'),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildStoreSection(),
               const SizedBox(height: 14),
-              _buildSectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _selectedImagePath == null ? '还没有选择图片' : '已选择一张图片',
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.tonalIcon(
-                          onPressed: _isPickingImage
-                              ? null
-                              : _pickImageAndSaveToSandbox,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: SoftPalette.accentOrangeSoft,
-                            foregroundColor: SoftPalette.textPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          icon: const Icon(Icons.photo_library_outlined),
-                          label: Text(_isPickingImage ? '选择中' : '选图'),
-                        ),
-                      ],
-                    ),
-                    if (_selectedImagePath != null) ...[
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.file(
-                          File(_selectedImagePath!),
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 180,
-                              width: double.infinity,
-                              alignment: Alignment.center,
-                              color: SoftPalette.surfaceElevated,
-                              child: const Text('图片加载失败'),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              _buildDishAndPriceSection(),
               const SizedBox(height: 14),
-              _buildSectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: flavorsController,
-                      decoration: const InputDecoration(
-                        labelText: '口味标签',
-                        hintText: '选择口味印象',
-                        suffixIcon: Icon(Icons.chevron_right_rounded),
-                      ),
-                      readOnly: true,
-                      onTap: _selectFlavors,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildFlavorPillsPreview(),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: experienceController,
-                      decoration: const InputDecoration(
-                        labelText: '今日感受',
-                        hintText: '留下一句记忆里的味道',
-                      ),
-                      maxLines: 3,
-                    ),
-                  ],
-                ),
-              ),
+              _buildQueueSection(),
+              const SizedBox(height: 14),
+              _buildImageSection(),
+              const SizedBox(height: 14),
+              _buildFlavorSection(),
+              const SizedBox(height: 14),
+              _buildExperienceSection(),
               const SizedBox(height: 12),
-              _buildSectionCard(
-                child: Row(
-                  children: [
-                    const Icon(Icons.place_outlined, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.currentLocation == null
-                            ? '当前位置还没准备好'
-                            : '当前位置 ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: SoftPalette.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildLocationSection(),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -444,109 +730,6 @@ class _CreateDishMarkState extends State<CreateDishMark> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FlavorSelectionDialog extends StatefulWidget {
-  final List<Flavor> selectedFlavors;
-
-  const _FlavorSelectionDialog({required this.selectedFlavors});
-
-  @override
-  State<_FlavorSelectionDialog> createState() => _FlavorSelectionDialogState();
-}
-
-class _FlavorSelectionDialogState extends State<_FlavorSelectionDialog> {
-  late List<Flavor> _tempSelection;
-
-  @override
-  void initState() {
-    super.initState();
-    _tempSelection = List<Flavor>.from(widget.selectedFlavors);
-  }
-
-  String _getFlavorLabel(Flavor flavor) {
-    switch (flavor) {
-      case Flavor.spicy:
-        return '辛辣';
-      case Flavor.sweet:
-        return '甜';
-      case Flavor.savory:
-        return '咸鲜';
-      case Flavor.sour:
-        return '酸';
-      case Flavor.bitter:
-        return '苦';
-      case Flavor.fresh:
-        return '新鲜';
-      case Flavor.greasy:
-        return '油腻';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        decoration: SoftDecorations.floatingCard(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-              child: Text(
-                '选择口味',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            ...Flavor.values.map(
-              (flavor) => CheckboxListTile(
-                activeColor: SoftPalette.accentOrange,
-                title: Text(_getFlavorLabel(flavor)),
-                value: _tempSelection.contains(flavor),
-                onChanged: (isSelected) {
-                  setState(() {
-                    if (isSelected == true) {
-                      if (!_tempSelection.contains(flavor)) {
-                        _tempSelection.add(flavor);
-                      }
-                    } else {
-                      _tempSelection.remove(flavor);
-                    }
-                  });
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text('取消'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () {
-                      Navigator.pop(context, _tempSelection);
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: SoftPalette.accentOrange,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('确定'),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
