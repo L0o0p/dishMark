@@ -4,8 +4,10 @@ class SoftPalette {
   static const Color background = Color(0xFFF4EFE8);
   static const Color surface = Color(0xFFFFFBF7);
   static const Color surfaceElevated = Color(0xFFFFF7EE);
+  static const Color inputBackground = Color(0xFFF5F5F5);
   static const Color textPrimary = Color(0xFF3F332A);
   static const Color textSecondary = Color(0xFF7B6B5D);
+  static const Color textPlaceholder = Color(0xFF8A8A8A);
   static const Color tagBackground = Color(0xFFE8DDD1);
   static const Color tagForeground = Color(0xFF6F5F51);
   static const Color accentOrange = Color(0xFFE6884D);
@@ -133,7 +135,7 @@ class SoftSpatialTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: SoftPalette.surface,
+        fillColor: SoftPalette.inputBackground,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
@@ -150,7 +152,7 @@ class SoftSpatialTheme {
           borderRadius: SoftRadius.input,
           borderSide: BorderSide(color: SoftPalette.accentOrange, width: 1.2),
         ),
-        hintStyle: const TextStyle(color: SoftPalette.textSecondary),
+        hintStyle: const TextStyle(color: SoftPalette.textPlaceholder),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: SoftPalette.tagBackground,

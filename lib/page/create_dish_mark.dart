@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/isar_service.dart';
@@ -294,7 +295,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     return GestureDetector(
       onTap: () => _toggleFlavor(flavor),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
@@ -333,7 +334,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: const Color(0xFFF0F0F0),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +377,9 @@ class _CreateDishMarkState extends State<CreateDishMark> {
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: Flavor.values.map(_buildFlavorOptionChip).toList(),
+                      children: Flavor.values
+                          .map(_buildFlavorOptionChip)
+                          .toList(),
                     ),
                   ),
                   crossFadeState: _isFlavorPanelExpanded
@@ -416,7 +419,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
                     foregroundColor: SoftPalette.textPrimary,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(24),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
@@ -481,7 +484,10 @@ class _CreateDishMarkState extends State<CreateDishMark> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               hintText: '¥',
-              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 12,
+              ),
             ),
           ),
         ),
@@ -514,16 +520,19 @@ class _CreateDishMarkState extends State<CreateDishMark> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: SoftPalette.accentOrange,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   selectedLabel,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Colors.white,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: Colors.white),
                 ),
               ),
             ],
@@ -578,9 +587,9 @@ class _CreateDishMarkState extends State<CreateDishMark> {
                         Text(
                           label,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: textColor,
-                          ),
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: textColor),
                         ),
                       ],
                     ),
@@ -600,50 +609,67 @@ class _CreateDishMarkState extends State<CreateDishMark> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _selectedImagePath == null ? '还没有选择图片' : '已选择一张图片',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
+          GestureDetector(
+            onTap: _isPickingImage ? null : _pickImageAndSaveToSandbox,
+            child: Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(20),
               ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: _isPickingImage ? null : _pickImageAndSaveToSandbox,
-                style: FilledButton.styleFrom(
-                  backgroundColor: SoftPalette.accentOrangeSoft,
-                  foregroundColor: SoftPalette.textPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                icon: const Icon(Icons.photo_library_outlined),
-                label: Text(_isPickingImage ? '选择中' : '选图'),
-              ),
-            ],
-          ),
-          if (_selectedImagePath != null) ...[
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: Image.file(
-                File(_selectedImagePath!),
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 180,
-                    width: double.infinity,
-                    alignment: Alignment.center,
-                    color: SoftPalette.surfaceElevated,
-                    child: const Text('图片加载失败'),
-                  );
-                },
-              ),
+              child: _selectedImagePath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.file(
+                        File(_selectedImagePath!),
+                        height: 180,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add,
+                                  size: 40,
+                                  color: SoftPalette.accentOrange,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '点击添加图片',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: SoftPalette.textPlaceholder,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add,
+                            size: 40,
+                            color: SoftPalette.accentOrange,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '点击添加图片',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: SoftPalette.textPlaceholder),
+                          ),
+                        ],
+                      ),
+                    ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -651,7 +677,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
 
   Widget _buildExperienceSection() {
     return _buildTitledSection(
-      title: '今日感受',
+      title: '简评',
       child: TextField(
         controller: experienceController,
         decoration: const InputDecoration(hintText: '留下一句记忆里的味道'),
@@ -672,9 +698,9 @@ class _CreateDishMarkState extends State<CreateDishMark> {
               widget.currentLocation == null
                   ? '当前位置还没准备好'
                   : '当前位置 ${widget.currentLocation!.latitude.toStringAsFixed(5)}, ${widget.currentLocation!.longitude.toStringAsFixed(5)}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: SoftPalette.textSecondary),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: SoftPalette.textSecondary,
+              ),
             ),
           ),
         ],
@@ -687,32 +713,35 @@ class _CreateDishMarkState extends State<CreateDishMark> {
     return Scaffold(
       appBar: AppBar(title: const Text('记录这一餐')),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '码住一次被记住的味道～',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: SoftPalette.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 14),
+              // Text(
+              //   '码住一次被记住的味道～',
+              //   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              //     color: SoftPalette.textSecondary,
+              //   ),
+              // ),
+              const SizedBox(height: 24),
               _buildStoreSection(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 24),
               _buildDishAndPriceSection(),
-              const SizedBox(height: 14),
-              _buildQueueSection(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 24),
+
               _buildImageSection(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 24),
               _buildFlavorSection(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 24),
               _buildExperienceSection(),
-              const SizedBox(height: 12),
-              _buildLocationSection(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              _buildQueueSection(),
+              if (kDebugMode) ...[
+                const SizedBox(height: 12),
+                _buildLocationSection(),
+                const SizedBox(height: 16),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
@@ -720,7 +749,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
                   style: FilledButton.styleFrom(
                     backgroundColor: SoftPalette.accentOrange,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 24),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                     ),
