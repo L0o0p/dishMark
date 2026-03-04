@@ -23,9 +23,27 @@ class SoftRadius {
   static const BorderRadius input = BorderRadius.all(Radius.circular(20));
 }
 
+class SoftMapActionTokens {
+  static const double sideButtonSize = 56;
+  static const double centerButtonSize = 68;
+  static const double sideIconSize = 23;
+  static const double centerIconSize = 40;
+  static const double labelSpacing = 8;
+  static const double blurSigma = 10;
+  static const Color glassFill = Color(0x60FFFFFF);
+  static const Color glassFillEmphasized = Color(0xFFFFFFFF);
+  static const Color glassBorder = Color(0x40FFFFFF);
+  static const Color glassHighlightTop = Color(0x52FFFFFF);
+  static const Color glassHighlightBottom = Color(0x00FFFFFF);
+}
+
 class SoftShadow {
   static const List<BoxShadow> floating = <BoxShadow>[
     BoxShadow(color: Color(0x12000000), blurRadius: 24, offset: Offset(0, 10)),
+  ];
+  static const List<BoxShadow> mapAction = <BoxShadow>[
+    BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 12)),
+    BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 3)),
   ];
 }
 
@@ -38,6 +56,42 @@ class SoftDecorations {
       color: color,
       borderRadius: borderRadius,
       boxShadow: SoftShadow.floating,
+    );
+  }
+
+  static BoxDecoration mapActionGlassButton({
+    required BorderRadius borderRadius,
+    bool emphasized = false,
+  }) {
+    return BoxDecoration(
+      color: emphasized
+          ? SoftMapActionTokens.glassFillEmphasized
+          : SoftMapActionTokens.glassFill,
+      borderRadius: borderRadius,
+      border: Border.all(color: SoftMapActionTokens.glassBorder, width: 1),
+    );
+  }
+
+  static BoxDecoration mapActionShadow({required BorderRadius borderRadius}) {
+    return BoxDecoration(
+      borderRadius: borderRadius,
+      boxShadow: SoftShadow.mapAction,
+    );
+  }
+
+  static BoxDecoration mapActionInnerHighlight({
+    required BorderRadius borderRadius,
+  }) {
+    return BoxDecoration(
+      borderRadius: borderRadius,
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          SoftMapActionTokens.glassHighlightTop,
+          SoftMapActionTokens.glassHighlightBottom,
+        ],
+      ),
     );
   }
 }

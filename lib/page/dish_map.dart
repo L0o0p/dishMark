@@ -14,6 +14,7 @@ import 'package:dishmark/widgets/dialogs.dart';
 import 'package:dishmark/widgets/draggable_scrollable_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:isar/isar.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -163,8 +164,7 @@ class _DishMapState extends State<DishMap> {
     String? imagePath,
   }) async {
     final int targetSizePx = ((_dishIconSizePx * scale).round()).clamp(1, 1024);
-    final String sourcePath =
-        imagePath?.trim().isNotEmpty == true
+    final String sourcePath = imagePath?.trim().isNotEmpty == true
         ? imagePath!.trim()
         : _dishIconAssetPath;
     final String iconCacheKey = '$sourcePath@$targetSizePx';
@@ -476,23 +476,86 @@ class _DishMapState extends State<DishMap> {
   }
 
   Widget _buildMapActionButton({
-    required String heroTag,
-    required IconData icon,
+    required Widget child,
     required Future<void> Function() onPressed,
     bool emphasized = false,
   }) {
-    return FloatingActionButton.small(
-      heroTag: heroTag,
-      onPressed: () {
-        unawaited(onPressed());
-      },
-      backgroundColor: emphasized
-          ? SoftPalette.accentOrangeSoft
-          : SoftPalette.surface,
-      foregroundColor: SoftPalette.textPrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      elevation: 0,
-      child: Icon(icon),
+    final double size = emphasized
+        ? SoftMapActionTokens.centerButtonSize
+        : SoftMapActionTokens.sideButtonSize;
+    final BorderRadius borderRadius = BorderRadius.circular(size / 2.5);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: SoftDecorations.mapActionShadow(borderRadius: borderRadius),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(
+            sigmaX: SoftMapActionTokens.blurSigma,
+            sigmaY: SoftMapActionTokens.blurSigma,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              decoration: SoftDecorations.mapActionGlassButton(
+                borderRadius: borderRadius,
+                emphasized: emphasized,
+              ),
+              child: InkWell(
+                customBorder: RoundedRectangleBorder(
+                  borderRadius: borderRadius,
+                ),
+                onTap: () {
+                  unawaited(onPressed());
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DecoratedBox(
+                      decoration: SoftDecorations.mapActionInnerHighlight(
+                        borderRadius: borderRadius,
+                      ),
+                    ),
+                    Center(child: child),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapActionItem({
+    required String label,
+    required Widget icon,
+    required Future<void> Function() onPressed,
+    bool emphasized = false,
+  }) {
+    final TextStyle defaultLabelStyle =
+        Theme.of(context).textTheme.bodySmall ??
+        const TextStyle(fontSize: 12, fontWeight: FontWeight.w500);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildMapActionButton(
+          onPressed: onPressed,
+          emphasized: emphasized,
+          child: icon,
+        ),
+        const SizedBox(height: SoftMapActionTokens.labelSpacing),
+        Text(
+          label,
+          style: defaultLabelStyle.copyWith(
+            color: SoftPalette.textPlaceholder,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 
@@ -603,6 +666,7 @@ class _DishMapState extends State<DishMap> {
         allMarkers.isEmpty ||
         (allMarkers.length == 1 && _myLocationMarker != null);
     final int memoryCount = _dishMarkerMap.length;
+    final String noteCountText = memoryCount > 99 ? '99+' : '$memoryCount';
 
     return Scaffold(
       body: Stack(
@@ -736,59 +800,72 @@ class _DishMapState extends State<DishMap> {
             ),
         ],
       ),
-      floatingActionButton: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: SoftDecorations.floatingCard(
-          color: SoftPalette.surface.withValues(alpha: 0.94),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildMapActionButton(
-              heroTag: 'go_my_location_fab',
-              icon: Icons.my_location_outlined,
-              onPressed: () async {
-                _goToMyLocation();
-              },
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildMapActionItem(
+            label: '定位',
+            icon: Icon(
+              Icons.gps_fixed_rounded,
+              size: SoftMapActionTokens.sideIconSize,
+              color: SoftPalette.textPrimary.withValues(alpha: 0.85),
             ),
-            const SizedBox(width: 12),
-            _buildMapActionButton(
-              heroTag: 'add_mark_fab',
-              icon: Icons.add_rounded,
-              emphasized: true,
-              onPressed: () async {
-                final DishMark? newDish = await Navigator.push<DishMark>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateDishMark(
-                      currentLocation: _lastTapLatLng ?? _myLatLng,
-                      initialStoreName: _lastPoiName,
-                    ),
+            onPressed: () async {
+              _goToMyLocation();
+            },
+          ),
+          const SizedBox(width: 20),
+          _buildMapActionItem(
+            label: '添加',
+            emphasized: true,
+            icon: SvgPicture.asset(
+              'assets/create_button.svg',
+              width: SoftMapActionTokens.centerIconSize,
+              height: SoftMapActionTokens.centerIconSize,
+            ),
+            onPressed: () async {
+              final DishMark? newDish = await Navigator.push<DishMark>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CreateDishMark(
+                    currentLocation: _lastTapLatLng ?? _myLatLng,
+                    initialStoreName: _lastPoiName,
                   ),
-                );
-                if (newDish != null) {
-                  await _playAppearAnimation(newDish);
-                }
-              },
+                ),
+              );
+              if (newDish != null) {
+                await _playAppearAnimation(newDish);
+              }
+            },
+          ),
+          const SizedBox(width: 20),
+          _buildMapActionItem(
+            label: '笔记',
+            icon: Text(
+              noteCountText,
+              style:
+                  Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: SoftPalette.accentOrange,
+                    fontWeight: FontWeight.w700,
+                  ) ??
+                  const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: SoftPalette.accentOrange,
+                  ),
             ),
-            const SizedBox(width: 12),
-            _buildMapActionButton(
-              heroTag: 'view_mark_list',
-              icon: Icons.menu_book_rounded,
-              onPressed: () async {
-                final int? selectedDishId = await Navigator.push<int>(
-                  context,
-                  MaterialPageRoute(builder: (_) => DishMarkList()),
-                );
-                _consumePendingDeletedMarkersIfVisible();
-                if (selectedDishId != null) {
-                  await _focusDishMarkerAndOpenSheet(selectedDishId);
-                }
-              },
-            ),
-          ],
-        ),
+            onPressed: () async {
+              final int? selectedDishId = await Navigator.push<int>(
+                context,
+                MaterialPageRoute(builder: (_) => DishMarkList()),
+              );
+              _consumePendingDeletedMarkersIfVisible();
+              if (selectedDishId != null) {
+                await _focusDishMarkerAndOpenSheet(selectedDishId);
+              }
+            },
+          ),
+        ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
