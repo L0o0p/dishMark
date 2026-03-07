@@ -4,8 +4,10 @@ class SoftPalette {
   static const Color background = Color(0xFFF4EFE8);
   static const Color surface = Color(0xFFFFFBF7);
   static const Color surfaceElevated = Color(0xFFFFF7EE);
+  static const Color inputBackground = Color(0xFFF5F5F5);
   static const Color textPrimary = Color(0xFF3F332A);
   static const Color textSecondary = Color(0xFF7B6B5D);
+  static const Color textPlaceholder = Color(0xFF8A8A8A);
   static const Color tagBackground = Color(0xFFE8DDD1);
   static const Color tagForeground = Color(0xFF6F5F51);
   static const Color accentOrange = Color(0xFFE6884D);
@@ -21,9 +23,27 @@ class SoftRadius {
   static const BorderRadius input = BorderRadius.all(Radius.circular(20));
 }
 
+class SoftMapActionTokens {
+  static const double sideButtonSize = 56;
+  static const double centerButtonSize = 68;
+  static const double sideIconSize = 23;
+  static const double centerIconSize = 40;
+  static const double labelSpacing = 8;
+  static const double blurSigma = 10;
+  static const Color glassFill = Color(0x60FFFFFF);
+  static const Color glassFillEmphasized = Color(0xFFFFFFFF);
+  static const Color glassBorder = Color(0x40FFFFFF);
+  static const Color glassHighlightTop = Color(0x52FFFFFF);
+  static const Color glassHighlightBottom = Color(0x00FFFFFF);
+}
+
 class SoftShadow {
   static const List<BoxShadow> floating = <BoxShadow>[
     BoxShadow(color: Color(0x12000000), blurRadius: 24, offset: Offset(0, 10)),
+  ];
+  static const List<BoxShadow> mapAction = <BoxShadow>[
+    BoxShadow(color: Color(0x14000000), blurRadius: 24, offset: Offset(0, 12)),
+    BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 3)),
   ];
 }
 
@@ -36,6 +56,42 @@ class SoftDecorations {
       color: color,
       borderRadius: borderRadius,
       boxShadow: SoftShadow.floating,
+    );
+  }
+
+  static BoxDecoration mapActionGlassButton({
+    required BorderRadius borderRadius,
+    bool emphasized = false,
+  }) {
+    return BoxDecoration(
+      color: emphasized
+          ? SoftMapActionTokens.glassFillEmphasized
+          : SoftMapActionTokens.glassFill,
+      borderRadius: borderRadius,
+      border: Border.all(color: SoftMapActionTokens.glassBorder, width: 1),
+    );
+  }
+
+  static BoxDecoration mapActionShadow({required BorderRadius borderRadius}) {
+    return BoxDecoration(
+      borderRadius: borderRadius,
+      boxShadow: SoftShadow.mapAction,
+    );
+  }
+
+  static BoxDecoration mapActionInnerHighlight({
+    required BorderRadius borderRadius,
+  }) {
+    return BoxDecoration(
+      borderRadius: borderRadius,
+      gradient: const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          SoftMapActionTokens.glassHighlightTop,
+          SoftMapActionTokens.glassHighlightBottom,
+        ],
+      ),
     );
   }
 }
@@ -133,7 +189,7 @@ class SoftSpatialTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: SoftPalette.surface,
+        fillColor: SoftPalette.inputBackground,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
@@ -150,7 +206,7 @@ class SoftSpatialTheme {
           borderRadius: SoftRadius.input,
           borderSide: BorderSide(color: SoftPalette.accentOrange, width: 1.2),
         ),
-        hintStyle: const TextStyle(color: SoftPalette.textSecondary),
+        hintStyle: const TextStyle(color: SoftPalette.textPlaceholder),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: SoftPalette.tagBackground,
