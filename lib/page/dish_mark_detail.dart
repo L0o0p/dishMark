@@ -1,7 +1,9 @@
 import 'dart:io';
 
+import 'package:dishmark/data/collection.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
+import 'package:dishmark/service/collection_service.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
@@ -21,6 +23,7 @@ class DishMarkDetail extends StatefulWidget {
 
 class _DishMarkDetailState extends State<DishMarkDetail> {
   final ImagePicker _imagePicker = ImagePicker();
+  final CollectionService _collectionService = CollectionService();
   DishMark? mark;
 
   Future<String?> _pickImageAndSaveToSandbox() async {
@@ -144,6 +147,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     final m = await IsarService.isar.dishMarks.get(widget.markId);
     if (m != null) {
       await m.store.load();
+      await m.collections.load();
       if (!mounted) return;
       setState(() {
         mark = m;
@@ -275,7 +279,9 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                                     }
                                   } catch (error) {
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(
                                           content: Text('选择图片失败: $error'),
                                         ),
@@ -426,6 +432,186 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     await load();
   }
 
+  Future<void> _addToCollections() async {
+    final DishMark? currentMark = mark;
+    if (currentMark == null) {
+      return;
+    }
+    await currentMark.collections.load();
+
+    final List<DishCollection> allCollections = await _collectionService
+        .getAllCollections();
+    if (!mounted) {
+      return;
+    }
+    if (allCollections.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('还没有集合，请先创建集合')));
+      return;
+    }
+
+    final Set<Id> existingIds = currentMark.collections
+        .map((DishCollection collection) => collection.id)
+        .toSet();
+    final Set<Id> selectedIds = <Id>{...existingIds};
+
+    final Map<String, int>?
+    result = await showModalBottomSheet<Map<String, int>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext sheetContext) {
+        return StatefulBuilder(
+          builder:
+              (
+                BuildContext context,
+                void Function(void Function()) setSheetState,
+              ) {
+                return Padding(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+                  ),
+                  child: Container(
+                    decoration: SoftDecorations.floatingCard(
+                      borderRadius: SoftRadius.largeCard,
+                    ),
+                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 44,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: SoftPalette.outline,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          '添加到集合',
+                          style: Theme.of(sheetContext).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '勾选后保存，会同步更新该菜品所在集合',
+                          style: Theme.of(sheetContext).textTheme.bodySmall
+                              ?.copyWith(color: SoftPalette.textSecondary),
+                        ),
+                        const SizedBox(height: 10),
+                        Flexible(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: allCollections.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final DishCollection collection =
+                                  allCollections[index];
+                              final bool checked = selectedIds.contains(
+                                collection.id,
+                              );
+                              return CheckboxListTile(
+                                value: checked,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                title: Text(
+                                  collection.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(
+                                  '${collection.dishMarks.length} 道菜',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onChanged: (_) {
+                                  setSheetState(() {
+                                    if (checked) {
+                                      selectedIds.remove(collection.id);
+                                    } else {
+                                      selectedIds.add(collection.id);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              int added = 0;
+                              int removed = 0;
+                              for (final DishCollection collection
+                                  in allCollections) {
+                                final bool existed = existingIds.contains(
+                                  collection.id,
+                                );
+                                final bool selected = selectedIds.contains(
+                                  collection.id,
+                                );
+                                if (!existed && selected) {
+                                  await _collectionService
+                                      .addDishesToCollection(
+                                        collection.id,
+                                        <Id>[currentMark.id],
+                                      );
+                                  added += 1;
+                                } else if (existed && !selected) {
+                                  await _collectionService
+                                      .removeDishFromCollection(
+                                        collection.id,
+                                        currentMark.id,
+                                      );
+                                  removed += 1;
+                                }
+                              }
+                              if (sheetContext.mounted) {
+                                Navigator.pop(sheetContext, <String, int>{
+                                  'added': added,
+                                  'removed': removed,
+                                });
+                              }
+                            },
+                            icon: const Icon(Icons.check_rounded),
+                            label: const Text('保存'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+        );
+      },
+    );
+
+    if (result == null) {
+      return;
+    }
+    final int added = result['added'] ?? 0;
+    final int removed = result['removed'] ?? 0;
+    if (added == 0 && removed == 0) {
+      return;
+    }
+
+    await load();
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('已添加 $added 个，移除 $removed 个')));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (mark == null) {
@@ -508,6 +694,23 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
               ),
             ),
             const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _addToCollections,
+                icon: const Icon(Icons.folder_outlined),
+                label: const Text('添加到集合'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: SoftPalette.textPrimary,
+                  side: const BorderSide(color: SoftPalette.outline),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
