@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/page/create_dish_mark.dart';
@@ -6,6 +8,7 @@ import 'package:dishmark/page/dish_mark_detail.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:isar/isar.dart';
 
 class DishMarkList extends StatefulWidget {
@@ -17,6 +20,8 @@ class DishMarkList extends StatefulWidget {
 
 class _DishMarkListState extends State<DishMarkList> {
   List<DishMark> marks = <DishMark>[];
+  bool isSelectionMode = false;
+  Set<int> selectedDishIds = {};
 
   @override
   void initState() {
@@ -130,10 +135,26 @@ class _DishMarkListState extends State<DishMarkList> {
         ? mark.store.value!.storeName
         : '还没有店名';
     final String note = (mark.experienceNote ?? '').trim();
+    final bool isSelected = selectedDishIds.contains(mark.id);
 
     return GestureDetector(
-      onTap: () => Navigator.pop<int>(context, mark.id),
+      onTap: () {
+        if (isSelectionMode) {
+          setState(() {
+            if (isSelected) {
+              selectedDishIds.remove(mark.id);
+            } else {
+              selectedDishIds.add(mark.id);
+            }
+          });
+        } else {
+          Navigator.pop<int>(context, mark.id);
+        }
+      },
       onLongPress: () async {
+        if (isSelectionMode) {
+          return;
+        }
         final bool? deleted = await Navigator.push<bool>(
           context,
           MaterialPageRoute(builder: (_) => DishMarkDetail(markId: mark.id)),
@@ -148,7 +169,18 @@ class _DishMarkListState extends State<DishMarkList> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(12),
-        decoration: SoftDecorations.floatingCard(),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? SoftPalette.accentOrangeSoft.withOpacity(0.3)
+              : SoftPalette.surface,
+          borderRadius: SoftRadius.card,
+          border: Border.all(
+            color: isSelected
+                ? SoftPalette.accentOrange
+                : SoftPalette.outline.withOpacity(0.5),
+            width: 2,
+          ),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -165,11 +197,43 @@ class _DishMarkListState extends State<DishMarkList> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    mark.dishName,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          mark.dishName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      if (isSelectionMode) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? SoftPalette.accentOrange
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: isSelected
+                                  ? SoftPalette.accentOrange
+                                  : SoftPalette.textSecondary,
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.white,
+                                )
+                              : null,
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -210,7 +274,38 @@ class _DishMarkListState extends State<DishMarkList> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('美食记忆清单')),
+      appBar: AppBar(
+        title: Text(
+          isSelectionMode ? '已选择 ${selectedDishIds.length} 个' : '美食记忆清单',
+        ),
+        actions: [
+          if (!isSelectionMode)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  isSelectionMode = true;
+                });
+              },
+              child: const Text(
+                '选择',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            )
+          else
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  isSelectionMode = false;
+                  selectedDishIds.clear();
+                });
+              },
+              child: const Text(
+                '取消',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+            ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: marks.isEmpty
@@ -233,19 +328,127 @@ class _DishMarkListState extends State<DishMarkList> {
                 ),
               ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CreateDishMark()),
-          );
-          await loadData();
-        },
-        backgroundColor: SoftPalette.accentOrangeSoft,
-        foregroundColor: SoftPalette.textPrimary,
-        child: const Icon(Icons.add_rounded),
-      ),
+      floatingActionButton: isSelectionMode
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                if (selectedDishIds.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('请先选择要创建集合的美食记录'),
+                      backgroundColor: SoftPalette.accentOrange,
+                    ),
+                  );
+                  return;
+                }
+                print('创建集合，选中的 ID: ${selectedDishIds.toList()}');
+                // TODO: 实现创建集合的逻辑
+              },
+              backgroundColor: SoftPalette.accentOrangeSoft,
+              foregroundColor: SoftPalette.textPrimary,
+              icon: const Icon(Icons.folder_outlined),
+              label: const Text('创建集合'),
+            )
+          : _buildListActionButton(
+              label: '添加',
+              emphasized: true,
+              icon: SvgPicture.asset(
+                'assets/create_button.svg',
+                width: SoftMapActionTokens.centerIconSize,
+                height: SoftMapActionTokens.centerIconSize,
+              ),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CreateDishMark()),
+                );
+                await loadData();
+              },
+            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  Widget _buildListActionButton({
+    required String label,
+    required Widget icon,
+    required Future<void> Function() onPressed,
+    bool emphasized = false,
+  }) {
+    final TextStyle defaultLabelStyle =
+        Theme.of(context).textTheme.bodySmall ??
+        const TextStyle(fontSize: 12, fontWeight: FontWeight.w500);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildListActionButtonBody(
+          onPressed: onPressed,
+          emphasized: emphasized,
+          child: icon,
+        ),
+        const SizedBox(height: SoftMapActionTokens.labelSpacing),
+        Text(
+          label,
+          style: defaultLabelStyle.copyWith(
+            color: SoftPalette.textPlaceholder,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildListActionButtonBody({
+    required Widget child,
+    required Future<void> Function() onPressed,
+    bool emphasized = false,
+  }) {
+    final double size = emphasized
+        ? SoftMapActionTokens.centerButtonSize
+        : SoftMapActionTokens.sideButtonSize;
+    final BorderRadius borderRadius = BorderRadius.circular(size / 2.5);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: SoftDecorations.mapActionShadow(borderRadius: borderRadius),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(
+            sigmaX: SoftMapActionTokens.blurSigma,
+            sigmaY: SoftMapActionTokens.blurSigma,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              decoration: SoftDecorations.mapActionGlassButton(
+                borderRadius: borderRadius,
+                emphasized: emphasized,
+              ),
+              child: InkWell(
+                customBorder: RoundedRectangleBorder(
+                  borderRadius: borderRadius,
+                ),
+                onTap: () {
+                  unawaited(onPressed());
+                },
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DecoratedBox(
+                      decoration: SoftDecorations.mapActionInnerHighlight(
+                        borderRadius: borderRadius,
+                      ),
+                    ),
+                    Center(child: child),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
