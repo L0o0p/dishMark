@@ -1,5 +1,6 @@
 import 'package:isar/isar.dart';
 
+import 'package:dishmark/data/collection.dart';
 import 'package:dishmark/data/store.dart';
 
 part 'dish_mark.g.dart';
@@ -20,6 +21,7 @@ class DishMark {
   String? experienceNote;
 
   String imagePath = '';
+  final collections = IsarLinks<DishCollection>();
 
   late DateTime createdAt;
   late DateTime updatedAt;
