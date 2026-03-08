@@ -76,6 +76,12 @@ const DishMarkSchema = CollectionSchema(
       name: r'store',
       target: r'Store',
       single: true,
+    ),
+    r'collections': LinkSchema(
+      id: -1341697351997038235,
+      name: r'collections',
+      target: r'DishCollection',
+      single: false,
     )
   },
   embeddedSchemas: {},
@@ -202,12 +208,14 @@ Id _dishMarkGetId(DishMark object) {
 }
 
 List<IsarLinkBase<dynamic>> _dishMarkGetLinks(DishMark object) {
-  return [object.store];
+  return [object.store, object.collections];
 }
 
 void _dishMarkAttach(IsarCollection<dynamic> col, Id id, DishMark object) {
   object.id = id;
   object.store.attach(col, col.isar.collection<Store>(), r'store', id);
+  object.collections
+      .attach(col, col.isar.collection<DishCollection>(), r'collections', id);
 }
 
 extension DishMarkQueryWhereSort on QueryBuilder<DishMark, DishMark, QWhere> {
@@ -1234,6 +1242,66 @@ extension DishMarkQueryLinks
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> storeIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.linkLength(r'store', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> collections(
+      FilterQuery<DishCollection> q) {
+    return QueryBuilder.apply(this, (query) {
+      return query.link(q, r'collections');
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition>
+      collectionsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'collections', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> collectionsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'collections', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition>
+      collectionsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'collections', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition>
+      collectionsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'collections', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition>
+      collectionsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(r'collections', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition>
+      collectionsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.linkLength(
+          r'collections', lower, includeLower, upper, includeUpper);
     });
   }
 }
