@@ -57,7 +57,7 @@ class _DishMarkListState extends State<DishMarkList> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('请先选择要创建集合的美食记录'),
-          backgroundColor: SoftPalette.accentOrange,
+          backgroundColor: SoftPalette.primary,
         ),
       );
       return;
@@ -74,16 +74,22 @@ class _DishMarkListState extends State<DishMarkList> {
       builder: (BuildContext sheetContext) {
         return Padding(
           padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+            left: SoftSpacing.lg,
+            right: SoftSpacing.lg,
+            top: SoftSpacing.lg,
+            bottom:
+                MediaQuery.of(sheetContext).viewInsets.bottom + SoftSpacing.lg,
           ),
           child: Container(
             decoration: SoftDecorations.floatingCard(
               borderRadius: SoftRadius.largeCard,
             ),
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            padding: const EdgeInsets.fromLTRB(
+              SoftSpacing.md,
+              SoftSpacing.sm,
+              SoftSpacing.md,
+              SoftSpacing.md,
+            ),
             child: Form(
               key: formKey,
               child: Column(
@@ -100,7 +106,7 @@ class _DishMarkListState extends State<DishMarkList> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: SoftSpacing.md),
                   Row(
                     children: [
                       Expanded(
@@ -120,7 +126,7 @@ class _DishMarkListState extends State<DishMarkList> {
                     style: Theme.of(sheetContext).textTheme.bodyMedium
                         ?.copyWith(color: SoftPalette.textSecondary),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: SoftSpacing.sm),
                   TextFormField(
                     controller: _collectionNameController,
                     maxLength: 50,
@@ -139,7 +145,7 @@ class _DishMarkListState extends State<DishMarkList> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: SoftSpacing.sm),
                   TextFormField(
                     controller: _collectionDescriptionController,
                     maxLength: 200,
@@ -150,7 +156,7 @@ class _DishMarkListState extends State<DishMarkList> {
                       hintText: '简单描述这个集合',
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: SoftSpacing.md),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
@@ -274,11 +280,14 @@ class _DishMarkListState extends State<DishMarkList> {
       return const SizedBox.shrink();
     }
     return Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: SoftSpacing.xs,
+      runSpacing: SoftSpacing.xs,
       children: mark.flavors.take(3).map((Flavor flavor) {
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(
+            horizontal: SoftSpacing.sm,
+            vertical: SoftSpacing.xxs,
+          ),
           decoration: const BoxDecoration(
             color: SoftPalette.tagBackground,
             borderRadius: SoftRadius.tag,
@@ -333,16 +342,16 @@ class _DishMarkListState extends State<DishMarkList> {
         }
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: SoftSpacing.sm),
+        padding: const EdgeInsets.all(SoftSpacing.md),
         decoration: BoxDecoration(
           color: isSelected
-              ? SoftPalette.accentOrangeSoft.withValues(alpha: 0.3)
+              ? SoftPalette.secondary.withValues(alpha: 0.3)
               : SoftPalette.surface,
           borderRadius: SoftRadius.card,
           border: Border.all(
             color: isSelected
-                ? SoftPalette.accentOrange
+                ? SoftPalette.primary
                 : SoftPalette.outline.withValues(alpha: 0.5),
             width: 2,
           ),
@@ -358,7 +367,7 @@ class _DishMarkListState extends State<DishMarkList> {
                 child: _buildDishImage(mark.imagePath),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: SoftSpacing.sm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,34 +383,35 @@ class _DishMarkListState extends State<DishMarkList> {
                         ),
                       ),
                       if (isSelectionMode) ...[
-                        const SizedBox(width: 8),
-                        Container(
+                        const SizedBox(width: SoftSpacing.xs),
+                        SizedBox(
                           width: 24,
                           height: 24,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? SoftPalette.accentOrange
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: isSelected
-                                  ? SoftPalette.accentOrange
-                                  : SoftPalette.textSecondary,
+                          child: Checkbox(
+                            value: isSelected,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                if (value == true) {
+                                  selectedDishIds.add(mark.id);
+                                } else {
+                                  selectedDishIds.remove(mark.id);
+                                }
+                              });
+                            },
+                            activeColor: SoftPalette.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            side: BorderSide(
+                              color: SoftPalette.textSecondary,
                               width: 2,
                             ),
-                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: isSelected
-                              ? const Icon(
-                                  Icons.check,
-                                  size: 16,
-                                  color: Colors.white,
-                                )
-                              : null,
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: SoftSpacing.xxs),
                   Text(
                     '📍 $storeName',
                     maxLines: 1,
@@ -410,9 +420,9 @@ class _DishMarkListState extends State<DishMarkList> {
                       color: SoftPalette.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: SoftSpacing.xs),
                   _buildFlavorPills(mark),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: SoftSpacing.xs),
                   Text(
                     note.isEmpty ? '还没有留下感受' : note,
                     maxLines: 2,
@@ -421,7 +431,7 @@ class _DishMarkListState extends State<DishMarkList> {
                       color: SoftPalette.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: SoftSpacing.xs),
                   Text(
                     '记录于 ${_formatDate(mark.createdAt)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -484,7 +494,12 @@ class _DishMarkListState extends State<DishMarkList> {
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        padding: const EdgeInsets.fromLTRB(
+          SoftSpacing.md,
+          SoftSpacing.xs,
+          SoftSpacing.md,
+          SoftSpacing.sm,
+        ),
         child: marks.isEmpty
             ? Center(
                 child: Text(
@@ -495,7 +510,7 @@ class _DishMarkListState extends State<DishMarkList> {
                 ),
               )
             : RefreshIndicator(
-                color: SoftPalette.accentOrange,
+                color: SoftPalette.primary,
                 onRefresh: loadData,
                 child: ListView.builder(
                   itemCount: marks.length,
@@ -508,7 +523,7 @@ class _DishMarkListState extends State<DishMarkList> {
       floatingActionButton: isSelectionMode
           ? FloatingActionButton.extended(
               onPressed: _showCreateCollectionSheet,
-              backgroundColor: SoftPalette.accentOrangeSoft,
+              backgroundColor: SoftPalette.secondary,
               foregroundColor: SoftPalette.textPrimary,
               icon: const Icon(Icons.folder_outlined),
               label: const Text('创建集合'),

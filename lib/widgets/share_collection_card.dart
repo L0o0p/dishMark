@@ -750,7 +750,7 @@ class _CollectionShareSheetState extends State<_CollectionShareSheet> {
                         height: 8,
                         decoration: BoxDecoration(
                           color: selected
-                              ? SoftPalette.accentOrange
+                              ? SoftPalette.primary
                               : SoftPalette.outline,
                           borderRadius: BorderRadius.circular(99),
                         ),

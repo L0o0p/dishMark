@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 import '../data/collection.dart';
 import '../data/dish_mark.dart';
 import '../data/store.dart';
+import '../data/trail.dart';
 
 class IsarService {
   static late Isar isar;
@@ -15,6 +16,7 @@ class IsarService {
       DishCollectionSchema,
       DishMarkSchema,
       StoreSchema,
+      TrailSchema,
     ], directory: dir.path);
   }
 }

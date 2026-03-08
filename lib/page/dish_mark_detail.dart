@@ -6,6 +6,7 @@ import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/collection_service.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/service/trail_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -24,7 +25,9 @@ class DishMarkDetail extends StatefulWidget {
 class _DishMarkDetailState extends State<DishMarkDetail> {
   final ImagePicker _imagePicker = ImagePicker();
   final CollectionService _collectionService = CollectionService();
+  final TrailService _trailService = TrailService();
   DishMark? mark;
+  bool _hasTrail = false;
 
   Future<String?> _pickImageAndSaveToSandbox() async {
     final XFile? pickedFile = await _imagePicker.pickImage(
@@ -57,11 +60,11 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
         ? Uri.parse(path).toFilePath()
         : path;
     final Widget fallback = Container(
-      height: 150,
+      height: 200,
       width: double.infinity,
       alignment: Alignment.center,
       color: SoftPalette.surfaceElevated,
-      child: const Text('图片加载失败'),
+      child: Text('图片加载失败', style: TextStyle(color: SoftPalette.textSecondary)),
     );
 
     Widget image;
@@ -88,8 +91,8 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(height: 150, width: double.infinity, child: image),
+      borderRadius: SoftRadius.card,
+      child: SizedBox(height: 200, width: double.infinity, child: image),
     );
   }
 
@@ -149,8 +152,10 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
       await m.store.load();
       await m.collections.load();
       if (!mounted) return;
+      final bool hasTrail = await _trailService.hasTrailForDishMark(m.id);
       setState(() {
         mark = m;
+        _hasTrail = hasTrail;
       });
     }
   }
@@ -227,7 +232,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                       decoration: const InputDecoration(labelText: '店名'),
                     ),
                     DropdownButtonFormField<QueueLevel>(
-                      initialValue: selectedQueueLevel,
+                      value: selectedQueueLevel,
                       decoration: const InputDecoration(labelText: '排队时长'),
                       items: QueueLevel.values.map((QueueLevel level) {
                         return DropdownMenuItem<QueueLevel>(
@@ -330,7 +335,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
               style: FilledButton.styleFrom(
-                backgroundColor: SoftPalette.accentOrange,
+                backgroundColor: SoftPalette.primary,
                 foregroundColor: Colors.white,
               ),
               child: const Text('保存'),
@@ -612,6 +617,114 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
     ).showSnackBar(SnackBar(content: Text('已添加 $added 个，移除 $removed 个')));
   }
 
+  Future<void> _addToTrail() async {
+    final DishMark? currentMark = mark;
+    if (currentMark == null) {
+      return;
+    }
+
+    final TextEditingController noteController = TextEditingController();
+    int? rating;
+    final bool? shouldAdd = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('添加到足迹'),
+          content: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: noteController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: '足迹笔记（可选）',
+                        hintText: '记录这次品尝的感受...',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '评分（可选）',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: List.generate(5, (index) {
+                        return IconButton(
+                          icon: Icon(
+                            index < (rating ?? 0)
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: index < (rating ?? 0)
+                                ? SoftPalette.primary
+                                : SoftPalette.textSecondary,
+                            size: 32,
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              rating = index + 1;
+                            });
+                          },
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: SoftPalette.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldAdd != true) {
+      noteController.dispose();
+      return;
+    }
+
+    final String note = noteController.text.trim();
+    noteController.dispose();
+
+    try {
+      await _trailService.addTrail(
+        dishMark: currentMark,
+        note: note.isEmpty ? null : note,
+        rating: rating,
+      );
+      if (mounted) {
+        setState(() {
+          _hasTrail = true;
+        });
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已添加到足迹')));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('添加到足迹失败：$error')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (mark == null) {
@@ -622,6 +735,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
         ? mark!.store.value!.storeName
         : '还没有店名';
     final String note = (mark!.experienceNote ?? '').trim();
+    final bool hasImage = mark!.imagePath.trim().isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -633,98 +747,157 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
+      body: SingleChildScrollView(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: SoftDecorations.floatingCard(),
+            // 图片展示区（可选）
+            if (hasImage) ...<Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SoftSpacing.lg,
+                  SoftSpacing.sm,
+                  SoftSpacing.lg,
+                  SoftSpacing.sm,
+                ),
+                child: _buildImagePreview(mark!.imagePath),
+              ),
+            ],
+
+            // 页面内容区
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                SoftSpacing.lg,
+                0,
+                SoftSpacing.lg,
+                SoftSpacing.lg,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '📍 $storeName',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '排队感受：${_formatQueueLevel(mark!.store.value?.queueLevel)}',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '人均：${_formatPrice(mark!.priceLevel)}',
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: mark!.flavors.map((flavor) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
+                  // 信息卡片
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(SoftSpacing.md),
+                    decoration: SoftDecorations.floatingCard(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 店铺信息
+                        Text(
+                          storeName,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        decoration: const BoxDecoration(
-                          color: SoftPalette.tagBackground,
-                          borderRadius: SoftRadius.tag,
+                        const SizedBox(height: SoftSpacing.sm),
+                        Text(
+                          '排队感受：${_formatQueueLevel(mark!.store.value?.queueLevel)}',
+                          style: Theme.of(context).textTheme.bodyLarge,
                         ),
-                        child: Text(
-                          _formatFlavor(flavor),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: SoftPalette.tagForeground,
-                                fontWeight: FontWeight.w600,
+                        const SizedBox(height: SoftSpacing.xs),
+                        Text(
+                          '人均：${_formatPrice(mark!.priceLevel)}',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+
+                        // 口味标签
+                        const SizedBox(height: SoftSpacing.md),
+                        Wrap(
+                          spacing: SoftSpacing.xs,
+                          runSpacing: SoftSpacing.xs,
+                          children: mark!.flavors.map((flavor) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: SoftSpacing.sm,
+                                vertical: SoftSpacing.xxs,
                               ),
+                              decoration: const BoxDecoration(
+                                color: SoftPalette.tagBackground,
+                                borderRadius: SoftRadius.tag,
+                              ),
+                              child: Text(
+                                _formatFlavor(flavor),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: SoftPalette.tagForeground,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    note.isEmpty ? '还没有留下感受' : note,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: SoftPalette.textSecondary,
+
+                        // 用餐感受
+                        const SizedBox(height: SoftSpacing.md),
+                        Text(
+                          note.isEmpty ? '还没有留下感受' : note,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: SoftPalette.textSecondary),
+                        ),
+                      ],
                     ),
                   ),
+
+                  const SizedBox(height: SoftSpacing.lg),
+
+                  // 底部操作区
+                  // 主操作按钮
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _hasTrail ? null : _addToTrail,
+                      icon: Icon(
+                        _hasTrail ? Icons.check_circle : Icons.map_outlined,
+                      ),
+                      label: Text(_hasTrail ? '已在足迹中' : '添加到足迹'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _hasTrail
+                            ? SoftPalette.success
+                            : SoftPalette.primary,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: SoftRadius.button,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: SoftSpacing.md),
+                  // 次级操作按钮
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _addToCollections,
+                          icon: const Icon(Icons.folder_outlined),
+                          label: const Text('添加到集合'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: SoftPalette.textPrimary,
+                            minimumSize: const Size(0, 48),
+                            side: const BorderSide(color: SoftPalette.outline),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: SoftRadius.button,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: SoftSpacing.xs),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _deleteMark,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('删除'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: SoftPalette.danger,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(0, 48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: SoftRadius.button,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
-              ),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _addToCollections,
-                icon: const Icon(Icons.folder_outlined),
-                label: const Text('添加到集合'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: SoftPalette.textPrimary,
-                  side: const BorderSide(color: SoftPalette.outline),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _deleteMark,
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('删除'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: SoftPalette.danger,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
               ),
             ),
           ],

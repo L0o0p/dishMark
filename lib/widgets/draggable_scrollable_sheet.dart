@@ -328,7 +328,7 @@ class _DraggableScrollableSheetExampleState
             IconButton.filledTonal(
               onPressed: _shareDish,
               style: IconButton.styleFrom(
-                backgroundColor: SoftPalette.accentOrangeSoft,
+                backgroundColor: SoftPalette.secondary,
                 foregroundColor: SoftPalette.textPrimary,
               ),
               icon: const Icon(Icons.ios_share_outlined),
