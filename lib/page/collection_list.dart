@@ -301,7 +301,14 @@ class _CollectionListPageState extends State<CollectionListPage> {
             : RefreshIndicator(
                 color: SoftPalette.accentOrange,
                 onRefresh: _loadCollections,
-                child: ListView.builder(
+                child: GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 0.72,
+                  ),
                   itemCount: _collections.length,
                   itemBuilder: (BuildContext itemContext, int index) {
                     final DishCollection collection = _collections[index];
@@ -326,7 +333,6 @@ class _CollectionListPageState extends State<CollectionListPage> {
                         ).showSnackBar(const SnackBar(content: Text('集合已删除')));
                       },
                       background: Container(
-                        margin: const EdgeInsets.only(bottom: 14),
                         alignment: Alignment.centerRight,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(
@@ -339,7 +345,6 @@ class _CollectionListPageState extends State<CollectionListPage> {
                         ),
                       ),
                       child: Container(
-                        margin: const EdgeInsets.only(bottom: 14),
                         decoration: SoftDecorations.floatingCard(),
                         child: InkWell(
                           borderRadius: SoftRadius.card,
@@ -388,6 +393,8 @@ class _CollectionListPageState extends State<CollectionListPage> {
                                         Expanded(
                                           child: Text(
                                             '${collection.dishMarks.length} 道菜 · 创建于 ${_formatDate(collection.createdAt)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: Theme.of(itemContext)
                                                 .textTheme
                                                 .bodySmall

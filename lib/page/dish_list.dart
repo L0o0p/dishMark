@@ -344,17 +344,8 @@ class _DishMarkListState extends State<DishMarkList> {
       child: Container(
         margin: const EdgeInsets.only(bottom: SoftSpacing.sm),
         padding: const EdgeInsets.all(SoftSpacing.md),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? SoftPalette.secondary.withValues(alpha: 0.3)
-              : SoftPalette.surface,
-          borderRadius: SoftRadius.card,
-          border: Border.all(
-            color: isSelected
-                ? SoftPalette.primary
-                : SoftPalette.outline.withValues(alpha: 0.5),
-            width: 2,
-          ),
+        decoration: SoftDecorations.floatingCard(
+          color: isSelected ? SoftPalette.surfaceElevated : SoftPalette.surface,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
