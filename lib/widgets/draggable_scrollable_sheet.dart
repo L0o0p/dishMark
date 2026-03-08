@@ -437,7 +437,7 @@ class _DraggableScrollableSheetExampleState
         builder: (BuildContext context, ScrollController scrollController) {
           return DecoratedBox(
             decoration: const BoxDecoration(
-              color: SoftPalette.background,
+              color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
             ),
             child: _isLoading
