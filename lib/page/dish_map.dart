@@ -12,6 +12,7 @@ import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:dishmark/widgets/dialogs.dart';
 import 'package:dishmark/widgets/draggable_scrollable_sheet.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -698,9 +699,11 @@ class _DishMapState extends State<DishMap> {
               }
             },
             onTap: (latLng) {
-              setState(() {
-                _lastTapLatLng = latLng;
-              });
+              if (kDebugMode) {
+                setState(() {
+                  _lastTapLatLng = latLng;
+                });
+              }
               if (_isDishSheetOpen) {
                 Navigator.of(context).maybePop();
               }
@@ -824,12 +827,18 @@ class _DishMapState extends State<DishMap> {
               height: SoftMapActionTokens.centerIconSize,
             ),
             onPressed: () async {
+              final LatLng? createLocation = kDebugMode
+                  ? (_lastTapLatLng ?? _myLatLng)
+                  : _myLatLng;
+              final String? createInitialStoreName = kDebugMode
+                  ? _lastPoiName
+                  : null;
               final DishMark? newDish = await Navigator.push<DishMark>(
                 context,
                 MaterialPageRoute(
                   builder: (_) => CreateDishMark(
-                    currentLocation: _lastTapLatLng ?? _myLatLng,
-                    initialStoreName: _lastPoiName,
+                    currentLocation: createLocation,
+                    initialStoreName: createInitialStoreName,
                   ),
                 ),
               );

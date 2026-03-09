@@ -1,12 +1,13 @@
 import 'dart:io';
 
 import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -37,6 +38,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   int _queueUiIndex = 0;
   String? _selectedImagePath;
   bool _isPickingImage = false;
+  String? _resolvedLocationLabel;
   static const List<String> _queueChoiceLabels = <String>[
     '不用排队',
     '< 30 min',
@@ -48,11 +50,101 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   @override
   void initState() {
     super.initState();
-    final String initialStoreName = widget.initialStoreName?.trim() ?? '';
-    if (initialStoreName.isNotEmpty) {
-      storeController.text = initialStoreName;
-    }
+    _bootstrapStoreName();
     _queueUiIndex = _queueLevelToUiIndex(_selectedQueueLevel);
+  }
+
+  Future<void> _bootstrapStoreName() async {
+    final String coordinateFallbackLabel = _coordinateLocationLabel();
+    if (coordinateFallbackLabel.isNotEmpty) {
+      storeController.text = coordinateFallbackLabel;
+    }
+
+    final LatLng? location = widget.currentLocation;
+    if (location == null) {
+      _logGeocode('currentLocation is null, skip reverse geocode.');
+      return;
+    }
+
+    final String? readableLocation = await _reverseGeocodeWithSystem(location);
+    if (!mounted || readableLocation == null || readableLocation.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      _logGeocode(
+        'reverse geocode fallback to coordinate label: "$coordinateFallbackLabel".',
+      );
+      return;
+    }
+
+    // 仅在用户尚未手动修改输入框时覆盖自动填充值。
+    final String currentText = storeController.text.trim();
+    final bool canOverwriteAutoText =
+        currentText.isEmpty || currentText == coordinateFallbackLabel;
+
+    _resolvedLocationLabel = readableLocation;
+    if (canOverwriteAutoText) {
+      storeController.text = readableLocation;
+    }
+    _logGeocode('resolved readable location: "$readableLocation".');
+  }
+
+  Future<String?> _reverseGeocodeWithSystem(LatLng location) async {
+    _logGeocode(
+      'start system reverse geocode, location=${location.latitude},${location.longitude}',
+    );
+    try {
+      final List<Placemark> placemarks = await placemarkFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+      if (placemarks.isEmpty) {
+        _logGeocode('placemark list is empty.');
+        return null;
+      }
+
+      final Placemark place = placemarks.first;
+      final List<String> parts = <String>[
+        if ((place.name ?? '').trim().isNotEmpty) place.name!.trim(),
+        if ((place.subLocality ?? '').trim().isNotEmpty)
+          place.subLocality!.trim(),
+        if ((place.locality ?? '').trim().isNotEmpty) place.locality!.trim(),
+        if ((place.administrativeArea ?? '').trim().isNotEmpty)
+          place.administrativeArea!.trim(),
+      ];
+      final List<String> unique = <String>[];
+      for (final String part in parts) {
+        if (part.isEmpty || unique.contains(part)) {
+          continue;
+        }
+        unique.add(part);
+      }
+      final String readable = unique.take(2).join(' · ');
+      return readable.isEmpty ? null : readable;
+    } catch (error) {
+      _logGeocode('system reverse geocode exception: $error');
+      return null;
+    }
+  }
+
+  void _logGeocode(String message) {
+    debugPrint('[LOC-GEOCODE] $message');
+  }
+
+  String _currentLocationStoreLabel() {
+    final String suggestion = _resolvedLocationLabel ?? '';
+    if (suggestion.isNotEmpty) {
+      return suggestion;
+    }
+    return _coordinateLocationLabel();
+  }
+
+  String _coordinateLocationLabel() {
+    final LatLng? location = widget.currentLocation;
+    if (location == null) {
+      return '';
+    }
+    return '当前位置 ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}';
   }
 
   String _getFlavorLabel(Flavor flavor) {
@@ -111,7 +203,7 @@ class _CreateDishMarkState extends State<CreateDishMark> {
   }
 
   void _fillStoreNameByGpsSuggestion() {
-    final String suggestion = widget.initialStoreName?.trim() ?? '';
+    final String suggestion = _currentLocationStoreLabel();
     if (suggestion.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -217,9 +309,12 @@ class _CreateDishMarkState extends State<CreateDishMark> {
 
     await IsarService.isar.writeTxn(() async {
       final storeNow = DateTime.now();
+      final String storeName = storeController.text.trim();
+      final String fallbackStoreName = _currentLocationStoreLabel();
       final store = Store()
-        ..storeName = storeController.text
+        ..storeName = storeName.isEmpty ? fallbackStoreName : storeName
         ..queueLevel = _selectedQueueLevel
+        // 保存时始终使用当前位置经纬度，不受店名编辑影响。
         ..latitude = currentLocation.latitude
         ..longitude = currentLocation.longitude
         ..createdAt = storeNow
@@ -446,16 +541,16 @@ class _CreateDishMarkState extends State<CreateDishMark> {
                   ),
                 ),
               ),
-              TextButton(
-                onPressed: _fillStoreNameByGpsSuggestion,
-                style: TextButton.styleFrom(
-                  foregroundColor: SoftPalette.accentOrange,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: const Size(36, 28),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('填入'),
-              ),
+              // TextButton(
+              //   onPressed: _fillStoreNameByGpsSuggestion,
+              //   style: TextButton.styleFrom(
+              //     foregroundColor: SoftPalette.accentOrange,
+              //     padding: const EdgeInsets.symmetric(horizontal: 8),
+              //     minimumSize: const Size(36, 28),
+              //     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              //   ),
+              //   child: const Text('填入'),
+              // ),
             ],
           ),
         ],

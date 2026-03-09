@@ -12,6 +12,8 @@ PODS:
   - fluwx/no_pay (0.0.1):
     - Flutter
     - OpenWeChatSDKNoPay (~> 2.0.5)
+  - geocoding_ios (1.0.5):
+    - Flutter
   - image_picker_ios (0.0.1):
     - Flutter
   - isar_flutter_libs (1.0.0):
@@ -29,6 +31,7 @@ DEPENDENCIES:
   - amap_flutter_map_plus (from `.symlinks/plugins/amap_flutter_map_plus/ios`)
   - Flutter (from `Flutter`)
   - fluwx (from `.symlinks/plugins/fluwx/ios`)
+  - geocoding_ios (from `.symlinks/plugins/geocoding_ios/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - isar_flutter_libs (from `.symlinks/plugins/isar_flutter_libs/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
@@ -48,6 +51,8 @@ EXTERNAL SOURCES:
     :path: Flutter
   fluwx:
     :path: ".symlinks/plugins/fluwx/ios"
+  geocoding_ios:
+    :path: ".symlinks/plugins/geocoding_ios/ios"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   isar_flutter_libs:
@@ -65,6 +70,7 @@ SPEC CHECKSUMS:
   AMapFoundation: 9885c48fc3a78fdfb84a0299a2293e56ea3c9fec
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   fluwx: fc07b03ebb407d68ae135a9f31967de03a5d11b2
+  geocoding_ios: 33776c9ebb98d037b5e025bb0e7537f6dd19646e
   image_picker_ios: 7fe1ff8e34c1790d6fff70a32484959f563a928a
   isar_flutter_libs: 9fc2cfb928c539e1b76c481ba5d143d556d94920
   OpenWeChatSDKNoPay: a391d2a7c0d4db1bdc870f885bd4cba99b64f243
