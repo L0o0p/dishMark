@@ -5,6 +5,7 @@ import 'package:dishmark/data/store.dart';
 import 'package:dishmark/page/dish_mark_detail.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/service/map_navigation_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:dishmark/widgets/share_card.dart';
 import 'package:flutter/material.dart';
@@ -369,6 +370,25 @@ class _DraggableScrollableSheetExampleState
           ),
         ),
         const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: () {
+              MapNavigationService.showNavigationOptions(
+                context: context,
+                store: _store,
+                placeName: storeName,
+              );
+            },
+            icon: const Icon(Icons.navigation_outlined),
+            label: const Text('导航到此处'),
+            style: FilledButton.styleFrom(
+              backgroundColor: SoftPalette.surfaceElevated,
+              foregroundColor: SoftPalette.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
         Row(
           children: <Widget>[
             Expanded(

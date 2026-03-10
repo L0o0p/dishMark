@@ -46,6 +46,9 @@
 		<string>weixin</string>
 		<string>weixinULAPI</string>
 		<string>weixinURLParamsAPI</string>
+		<string>iosamap</string>
+		<string>qqmap</string>
+		<string>baidumap</string>
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>

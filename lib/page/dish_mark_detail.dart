@@ -6,6 +6,7 @@ import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/collection_service.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/service/map_navigation_service.dart';
 import 'package:dishmark/service/trail_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
@@ -854,6 +855,29 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
                             : SoftPalette.primary,
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: SoftRadius.button,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: SoftSpacing.md),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        MapNavigationService.showNavigationOptions(
+                          context: context,
+                          store: mark!.store.value,
+                          placeName: storeName,
+                        );
+                      },
+                      icon: const Icon(Icons.navigation_outlined),
+                      label: const Text('导航到此处'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: SoftPalette.textPrimary,
+                        minimumSize: const Size(double.infinity, 48),
+                        side: const BorderSide(color: SoftPalette.outline),
                         shape: RoundedRectangleBorder(
                           borderRadius: SoftRadius.button,
                         ),
