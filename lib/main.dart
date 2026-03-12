@@ -1,5 +1,7 @@
 import 'package:dishmark/page/dish_map.dart';
 import 'package:dishmark/data/dish_mark.dart';
+import 'package:dishmark/page/dish_mark_detail.dart';
+import 'package:dishmark/service/deep_link_service.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/service/wechat_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
@@ -71,12 +73,57 @@ Future<void> _readTestData() async {
   }
 }
 
-class MainApp extends StatelessWidget {
+class MainApp extends StatefulWidget {
   const MainApp({super.key});
+
+  @override
+  State<MainApp> createState() => _MainAppState();
+}
+
+class _MainAppState extends State<MainApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  late final DeepLinkService _deepLinkService = DeepLinkService();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDeepLinks();
+  }
+
+  Future<void> _initializeDeepLinks() async {
+    await _deepLinkService.start(onUri: _handleIncomingUri);
+  }
+
+  void _handleIncomingUri(Uri uri) {
+    final int? markId = DeepLinkService.parseDishMarkId(uri);
+    if (markId == null) {
+      debugPrint('Deep link ignored (invalid id): $uri');
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final NavigatorState? navigator = _navigatorKey.currentState;
+      if (navigator == null) {
+        return;
+      }
+      navigator.push(
+        MaterialPageRoute<void>(
+          builder: (_) => DishMarkDetail(markId: markId),
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _deepLinkService.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: SoftSpatialTheme.build(),
       home: const DishMap(),

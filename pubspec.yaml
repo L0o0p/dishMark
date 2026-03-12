@@ -33,6 +33,7 @@ dependencies:
   fluwx: ^5.7.5
   flutter_svg: ^2.2.1
   geocoding: ^4.0.0
+  app_links: ^6.4.0
 
 dev_dependencies:
   flutter_test:
