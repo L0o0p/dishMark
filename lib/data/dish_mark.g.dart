@@ -58,8 +58,13 @@ const DishMarkSchema = CollectionSchema(
       name: r'priceLevel',
       type: IsarType.double,
     ),
-    r'updatedAt': PropertySchema(
+    r'shareUrl': PropertySchema(
       id: 8,
+      name: r'shareUrl',
+      type: IsarType.string,
+    ),
+    r'updatedAt': PropertySchema(
+      id: 9,
       name: r'updatedAt',
       type: IsarType.dateTime,
     )
@@ -106,6 +111,12 @@ int _dishMarkEstimateSize(
   }
   bytesCount += 3 + object.flavors.length;
   bytesCount += 3 + object.imagePath.length * 3;
+  {
+    final value = object.shareUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -123,7 +134,8 @@ void _dishMarkSerialize(
   writer.writeString(offsets[5], object.imagePath);
   writer.writeDateTime(offsets[6], object.lastTastedAt);
   writer.writeDouble(offsets[7], object.priceLevel);
-  writer.writeDateTime(offsets[8], object.updatedAt);
+  writer.writeString(offsets[8], object.shareUrl);
+  writer.writeDateTime(offsets[9], object.updatedAt);
 }
 
 DishMark _dishMarkDeserialize(
@@ -146,7 +158,8 @@ DishMark _dishMarkDeserialize(
   object.imagePath = reader.readString(offsets[5]);
   object.lastTastedAt = reader.readDateTimeOrNull(offsets[6]);
   object.priceLevel = reader.readDoubleOrNull(offsets[7]);
-  object.updatedAt = reader.readDateTime(offsets[8]);
+  object.shareUrl = reader.readStringOrNull(offsets[8]);
+  object.updatedAt = reader.readDateTime(offsets[9]);
   return object;
 }
 
@@ -178,6 +191,8 @@ P _dishMarkDeserializeProp<P>(
     case 7:
       return (reader.readDoubleOrNull(offset)) as P;
     case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1173,6 +1188,152 @@ extension DishMarkQueryFilter
     });
   }
 
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'shareUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'shareUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'shareUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'shareUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'shareUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'shareUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'shareUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'shareUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'shareUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'shareUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'shareUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterFilterCondition> shareUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'shareUrl',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<DishMark, DishMark, QAfterFilterCondition> updatedAtEqualTo(
       DateTime value) {
     return QueryBuilder.apply(this, (query) {
@@ -1391,6 +1552,18 @@ extension DishMarkQuerySortBy on QueryBuilder<DishMark, DishMark, QSortBy> {
     });
   }
 
+  QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByShareUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shareUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByShareUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shareUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<DishMark, DishMark, QAfterSortBy> sortByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -1502,6 +1675,18 @@ extension DishMarkQuerySortThenBy
     });
   }
 
+  QueryBuilder<DishMark, DishMark, QAfterSortBy> thenByShareUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shareUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<DishMark, DishMark, QAfterSortBy> thenByShareUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'shareUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<DishMark, DishMark, QAfterSortBy> thenByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -1569,6 +1754,13 @@ extension DishMarkQueryWhereDistinct
     });
   }
 
+  QueryBuilder<DishMark, DishMark, QDistinct> distinctByShareUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'shareUrl', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<DishMark, DishMark, QDistinct> distinctByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAt');
@@ -1629,6 +1821,12 @@ extension DishMarkQueryProperty
   QueryBuilder<DishMark, double?, QQueryOperations> priceLevelProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'priceLevel');
+    });
+  }
+
+  QueryBuilder<DishMark, String?, QQueryOperations> shareUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'shareUrl');
     });
   }
 

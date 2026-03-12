@@ -72,7 +72,7 @@ class TrailService {
 
   Future<void> updateTrail(Trail trail) async {
     await _isar.writeTxn(() async {
-      trail..updatedAt = DateTime.now();
+      trail.updatedAt = DateTime.now();
       await _isar.trails.put(trail);
     });
   }

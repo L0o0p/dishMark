@@ -21,6 +21,7 @@ class DishMark {
   String? experienceNote;
 
   String imagePath = '';
+  String? shareUrl;
   final collections = IsarLinks<DishCollection>();
 
   late DateTime createdAt;

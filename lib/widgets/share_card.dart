@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
+import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/service/share_link_service.dart';
 import 'package:dishmark/service/wechat_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
@@ -127,6 +128,41 @@ class _DishShareSheetState extends State<_DishShareSheet> {
         '口味：${tags.isEmpty ? '-' : tags}\n'
         '价格：${_formatPrice(widget.dish.priceLevel)}\n'
         '简评：${note.isEmpty ? '-' : note}';
+  }
+
+  String _resolveShareUrl() {
+    return ShareLinkService.resolveMomentShareUrl(widget.dish);
+  }
+
+  String _buildShareTextWithUrl(String shareUrl) {
+    return '${_buildShareText()}\n$shareUrl';
+  }
+
+  Future<void> _ensureShareUrlPersisted(String shareUrl) async {
+    final String existing = (widget.dish.shareUrl ?? '').trim();
+    if (existing.isNotEmpty) {
+      return;
+    }
+
+    try {
+      await IsarService.isar.writeTxn(() async {
+        final DishMark? latest = await IsarService.isar.dishMarks.get(
+          widget.dish.id,
+        );
+        if (latest == null) {
+          return;
+        }
+        if ((latest.shareUrl ?? '').trim().isNotEmpty) {
+          widget.dish.shareUrl = latest.shareUrl;
+          return;
+        }
+        latest.shareUrl = shareUrl;
+        await IsarService.isar.dishMarks.put(latest);
+        widget.dish.shareUrl = shareUrl;
+      });
+    } catch (error) {
+      debugPrint('persist share url failed: $error');
+    }
   }
 
   Future<File?> _captureCurrentTemplateAsImage() async {
@@ -284,13 +320,70 @@ class _DishShareSheetState extends State<_DishShareSheet> {
   }
 
   Future<void> _copyShareText() async {
-    await Clipboard.setData(ClipboardData(text: _buildShareText()));
+    final String shareUrl = _resolveShareUrl();
+    await Clipboard.setData(
+      ClipboardData(text: _buildShareTextWithUrl(shareUrl)),
+    );
+    await _ensureShareUrlPersisted(shareUrl);
     if (!mounted) {
       return;
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('分享文案已复制到剪贴板')));
+    ).showSnackBar(const SnackBar(content: Text('分享文案和链接已复制到剪贴板')));
+  }
+
+  Future<void> _shareLinkToWeChat({
+    required WeChatScene scene,
+    required String targetHint,
+  }) async {
+    final String shareUrl = _resolveShareUrl();
+    await _ensureShareUrlPersisted(shareUrl);
+
+    final bool wechatReady = await WeChatService.ensureInitialized();
+    if (!mounted) {
+      return;
+    }
+    if (!wechatReady) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('微信不可用，请检查 fluwx 配置或微信安装状态')),
+      );
+      return;
+    }
+
+    try {
+      final String title = widget.dish.dishName;
+      final String description = _buildShareText();
+      final bool launched = await WeChatService.client.share(
+        WeChatShareWebPageModel(
+          shareUrl,
+          title: title,
+          description: description,
+          scene: scene,
+        ),
+      );
+      if (!mounted) {
+        return;
+      }
+      if (!launched) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('拉起微信失败，请稍后重试')));
+        return;
+      }
+      final String message = '已拉起微信，请在$targetHint 中完成发送';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('分享失败，请稍后重试')));
+      debugPrint('share link failed: $error');
+    }
   }
 
   Rect? _getSharePositionOrigin() {
@@ -311,24 +404,12 @@ class _DishShareSheetState extends State<_DishShareSheet> {
     _lastSystemShareAt = now;
 
     try {
-      final File? imageFile = await _captureCurrentTemplateAsImage();
-      if (!mounted) {
-        return;
-      }
-      if (imageFile == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('分享图片生成失败，请重试')));
-        return;
-      }
-
-      await Share.shareXFiles(<XFile>[
-        XFile(
-          imageFile.path,
-          name: 'dishmark_${widget.dish.id}_${_currentTemplate + 1}.png',
-          mimeType: 'image/png',
-        ),
-      ], sharePositionOrigin: _getSharePositionOrigin());
+      final String shareUrl = _resolveShareUrl();
+      await _ensureShareUrlPersisted(shareUrl);
+      await Share.share(
+        _buildShareTextWithUrl(shareUrl),
+        sharePositionOrigin: _getSharePositionOrigin(),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -746,6 +827,19 @@ class _DishShareSheetState extends State<_DishShareSheet> {
                                   icon: Icons.copy_all_outlined,
                                   label: 'Copy',
                                   onPressed: _copyShareText,
+                                ),
+                              ),
+                              SizedBox(
+                                width: itemWidth,
+                                child: _buildShareAction(
+                                  icon: Icons.link,
+                                  label: '链接',
+                                  onPressed: () {
+                                    _shareLinkToWeChat(
+                                      scene: WeChatScene.session,
+                                      targetHint: '微信会话',
+                                    );
+                                  },
                                 ),
                               ),
                               SizedBox(
