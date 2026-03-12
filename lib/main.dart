@@ -1,8 +1,7 @@
 import 'package:dishmark/page/dish_map.dart';
+import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/service/wechat_service.dart';
-import 'package:dishmark/data/store.dart';
-import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:isar/isar.dart';

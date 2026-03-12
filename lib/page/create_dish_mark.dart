@@ -4,6 +4,7 @@ import 'package:amap_flutter_base_plus/amap_flutter_base_plus.dart';
 import 'package:dishmark/data/dish_mark.dart';
 import 'package:dishmark/data/store.dart';
 import 'package:dishmark/service/isar_service.dart';
+import 'package:dishmark/service/share_link_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -334,6 +335,8 @@ class _CreateDishMarkState extends State<CreateDishMark> {
         ..updatedAt = now
         ..lastTastedAt = now;
 
+      await IsarService.isar.dishMarks.put(dish);
+      dish.shareUrl = ShareLinkService.buildMomentShareUrlById(dish.id);
       await IsarService.isar.dishMarks.put(dish);
       await dish.store.save();
       newDishMark = dish;

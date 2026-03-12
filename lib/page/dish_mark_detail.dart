@@ -7,6 +7,7 @@ import 'package:dishmark/service/collection_service.dart';
 import 'package:dishmark/service/event_bus.dart';
 import 'package:dishmark/service/isar_service.dart';
 import 'package:dishmark/service/map_navigation_service.dart';
+import 'package:dishmark/service/share_link_service.dart';
 import 'package:dishmark/service/trail_service.dart';
 import 'package:dishmark/theme/soft_spatial_theme.dart';
 import 'package:flutter/material.dart';
@@ -403,6 +404,7 @@ class _DishMarkDetailState extends State<DishMarkDetail> {
         ..imagePath = editedImagePath.trim()
         ..priceLevel = priceValue
         ..experienceNote = note.isEmpty ? null : note
+        ..shareUrl = ShareLinkService.resolveMomentShareUrl(m)
         ..updatedAt = DateTime.now();
 
       final existingStore = m.store.value;
